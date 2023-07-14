@@ -1,0 +1,28 @@
+{
+  "name": "Simple Search",
+  "author": "chooyy",
+  "url": "https://github.com/choyy/simple-search",
+  "version": "0.0.1",
+  "minAppVersion": "2.8.0",
+  "backends": ["windows", "linux", "darwin"],
+  "frontends": ["desktop"],
+  "displayName": {
+    "default": "Simple Search",
+    "zh_CN": "简易搜索"
+  },
+  "description": {
+    "default": "更高效的搜索方式",
+    "zh_CN": "更高效的搜索方式"
+  },
+  "readme": {
+    "default": "README.md",
+    "zh_CN": "README.md"
+  },
+  "funding": {
+    "openCollective": "",
+    "patreon": "",
+    "github": "",
+    "custom": [
+    ]
+  }
+}
