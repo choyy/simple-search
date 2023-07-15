@@ -153,13 +153,14 @@ class SimpleSearch extends siyuan.Plugin {
     const openSearchCallback = function(mutationsList) {
         for (let i = 0; i < mutationsList.length; i++) {
             if (mutationsList[i].addedNodes.length > 0 && mutationsList[i].addedNodes[0].getAttribute('data-key') == "⌘P") {
-				last_search_method = -1; // 每次打开搜索都要设置搜索方法
+                last_search_method = -1; // 每次打开搜索都要设置搜索方法
                 // 插入新搜索框，隐藏原搜索框
                 let originalSearchInput = mutationsList[i].addedNodes[0].getElementsByClassName('b3-text-field b3-text-field--text')[0];
                 let simpleSearchInput = originalSearchInput.cloneNode();
                 simpleSearchInput.id = "simpleSearchInput";
                 simpleSearchInput.value = "";
                 originalSearchInput.before(simpleSearchInput);
+                originalSearchInput.style.display = "none";
                 const input_event_func = function () {
                     search_keywords = simpleSearchInput.value;
                     if_search_keywords_changed = true;
@@ -219,7 +220,7 @@ class SimpleSearch extends siyuan.Plugin {
   }
   
   onunload() {
-	// 开始观察目标节点
+	// 停止观察目标节点
     observer.disconnect();
 	console.log("simple search plugin stop...")
   }
