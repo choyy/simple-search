@@ -152,7 +152,7 @@ class SimpleSearch extends siyuan.Plugin {
     let if_search_keywords_changed = false;
     const openSearchCallback = function(mutationsList) {
         for (let i = 0; i < mutationsList.length; i++) {
-            if (mutationsList[i].addedNodes.length > 0 && mutationsList[i].addedNodes[0].getAttribute('data-key') == "⌘P") {
+            if (mutationsList[i].addedNodes.length > 0 && mutationsList[i].addedNodes[0].getAttribute('data-key') == window.siyuan.config.keymap.general.globalSearch.custom) {
                 last_search_method = -1; // 每次打开搜索都要设置搜索方法
                 // 插入新搜索框，隐藏原搜索框
                 let originalSearchInput = mutationsList[i].addedNodes[0].getElementsByClassName('b3-text-field b3-text-field--text')[0];
