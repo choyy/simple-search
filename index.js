@@ -42,10 +42,10 @@ function translateSearchInput(search_keywords) {
         if (options[i].match(/e/) != null) {
             let sql_extended_search = "select * from blocks as b1 where type ='d' ";
             for (let i = 0; i < key_words.length; i++) {
-                sql_extended_search += "and path in (select path from blocks as b2 where b2.path = b1.path and b2.content like '%" + key_words[i] + "%') ";
+                sql_extended_search += "and path in (select path from blocks where content like '%" + key_words[i] + "%') ";
             }
             for (let i = 0; i < excluded_key_words.length; i++) {
-                sql_extended_search += "and path not in (select path from blocks as b2 where b2.path = b1.path and b2.content like '%" + excluded_key_words[i] + "%') ";
+                sql_extended_search += "and path not in (select path from blocks where content like '%" + excluded_key_words[i] + "%') ";
             }
             return "-s" + sql_extended_search;
         }
@@ -153,6 +153,7 @@ class SimpleSearch extends siyuan.Plugin {
     const openSearchCallback = function(mutationsList) {
         for (let i = 0; i < mutationsList.length; i++) {
             if (mutationsList[i].addedNodes.length > 0 && mutationsList[i].addedNodes[0].getAttribute('data-key') == "⌘P") {
+				last_search_method = -1; // 每次打开搜索都要设置搜索方法
                 // 插入新搜索框，隐藏原搜索框
                 let originalSearchInput = mutationsList[i].addedNodes[0].getElementsByClassName('b3-text-field b3-text-field--text')[0];
                 let simpleSearchInput = originalSearchInput.cloneNode();

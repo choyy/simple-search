@@ -64,3 +64,11 @@
 
 比如使用`-q中国历史 NOT 苏联`即可使用查询语法搜索`中国历史 NOT 苏联`，使用`-s + SQL语句`即可使用SQL搜索。
 
+# 6. 反馈与建议
+
+可在[【插件】简易搜索 - 更高效的搜索方式 - 链滴](https://ld246.com/article/1689344075636)或[Issues · choyy/simple-search](https://github.com/choyy/simple-search/issues)或某QQ群提交反馈或建议。
+
+# 7. 更新日志
+
+- v0.0.2，提升扩展范围搜索的搜索速度
+- v0.0.1，初次提交
