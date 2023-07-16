@@ -47,7 +47,7 @@ function translateSearchInput(search_keywords) {
             for (let i = 0; i < excluded_key_words.length; i++) {
                 sql_extended_search += "and path not in (select path from blocks where content like '%" + excluded_key_words[i] + "%') ";
             }
-            return "-s" + sql_extended_search;
+            return "-s" + sql_extended_search + "order by updated desc";
         }
     }
 
