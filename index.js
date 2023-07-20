@@ -4,11 +4,11 @@ function translateSearchInput(search_keywords) {
     if (search_keywords.length < 2 || search_keywords.match("^-[wqrs]") != null) {
         return search_keywords;
     }
-    let input_text_items   = search_keywords.split(" ");
-    let key_words          = [];                     // 搜索关键词
-    let excluded_key_words = [];                     // 排除的关键词
-    let options            = [];                     // 搜索选项
-    let if_options_exist = false;
+    let input_text_items            = search_keywords.split(" ");
+    let key_words                   = [];                          // 搜索关键词
+    let excluded_key_words          = [];                          // 排除的关键词
+    let options                     = [];                          // 搜索选项
+    let if_options_exist            = false;
     let if_excluded_key_words_exist = false;
     for (let i = 0; i < input_text_items.length; i++) {
         if(input_text_items[i] == "" || input_text_items[i] == "-"){
@@ -37,17 +37,37 @@ function translateSearchInput(search_keywords) {
         }
         return query_syntax;
     }
+    let sql_default_order_by = "order by case type \
+ when 'd' then 1\
+ when 'h' then 2\
+ when 'i' then 3\
+ when 'p' then 4\
+ when 't' then 5\
+ when 'b' then 6\
+ when 'c' then 7\
+ when 'm' then 8\
+ when 'l' then 9\
+ when 's' then 10\
+ when 'html' then 11\
+ when 'widget' then 12\
+ when 'query_embed' then 13\
+ when 'iframe' then 14\
+ end, updated desc";
     // 判断是否扩展范围搜索，若是则直接返回扩展范围搜索的sql语句
     for (let i = 0; i < options.length; i++) {
         if (options[i].match(/e/) != null) {
-            let sql_extended_search = "select * from blocks as b1 where type ='d' ";
+            let sql_extended_search = "select path from blocks where type ='d' ";
+            let sql_content_like = "";
             for (let i = 0; i < key_words.length; i++) {
                 sql_extended_search += "and path in (select path from blocks where content like '%" + key_words[i] + "%') ";
+                sql_content_like += "content like '%" + key_words[i] + "%' or ";
             }
             for (let i = 0; i < excluded_key_words.length; i++) {
                 sql_extended_search += "and path not in (select path from blocks where content like '%" + excluded_key_words[i] + "%') ";
             }
-            return "-s" + sql_extended_search + "order by updated desc";
+            return "-s" + "select * from blocks where path in (" +
+                sql_extended_search + ") and (" + sql_content_like.slice(0, -4) + ")" +
+                sql_default_order_by;
         }
     }
 
@@ -108,22 +128,7 @@ function translateSearchInput(search_keywords) {
         }
         sql_order_by += " end, updated desc";
     } else {
-        sql_order_by += "\
- when 'd' then 1\
- when 'h' then 2\
- when 'i' then 3\
- when 'p' then 4\
- when 't' then 5\
- when 'b' then 6\
- when 'c' then 7\
- when 'm' then 8\
- when 'l' then 9\
- when 's' then 10\
- when 'html' then 11\
- when 'widget' then 12\
- when 'query_embed' then 13\
- when 'iframe' then 14\
- end, updated desc";
+        sql_order_by = sql_default_order_by;
     }
 
     // 完整sql语句
