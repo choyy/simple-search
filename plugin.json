@@ -2,10 +2,10 @@
   "name": "Simple Search",
   "author": "chooyy",
   "url": "https://github.com/choyy/simple-search",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "minAppVersion": "2.8.0",
-  "backends": ["windows", "linux", "darwin"],
-  "frontends": ["desktop"],
+  "backends": ["windows", "linux", "darwin", "docker"],
+  "frontends": ["desktop", "browser-desktop"],
   "displayName": {
     "default": "Simple Search",
     "zh_CN": "简易搜索"
