@@ -66,7 +66,7 @@ function translateSearchInput(search_keywords) {
                 sql_extended_search += "and path not in (select path from blocks where content like '%" + excluded_key_words[i] + "%') ";
             }
             return "-s" + "select * from blocks where path in (" +
-                sql_extended_search + ") and (" + sql_content_like.slice(0, -4) + ")" +
+                sql_extended_search + ") and (" + sql_content_like.slice(0, -4) + ") and type not rlike '^[libs]$'" +
                 sql_default_order_by;
         }
     }
