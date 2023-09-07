@@ -13,7 +13,7 @@ function translateSearchInput(search_keywords) {
     for (let i = 0; i < input_text_items.length; i++) {
         if(input_text_items[i] == "" || input_text_items[i] == "-"){
             continue;
-        } else if (input_text_items[i].match(/^-[kedhlptbsicm]+$/) != null) { // k为当前文档搜索，e为扩展搜索，其他为块类型
+        } else if (input_text_items[i].match(/^-[kedhlptbsicm1-6]+$/) != null) { // k为当前文档搜索，e为扩展搜索，其他为块类型
             options.push(input_text_items[i].substring(1, input_text_items[i].length));
             if_options_exist = true;
         }
@@ -106,7 +106,18 @@ function translateSearchInput(search_keywords) {
     }
     let sql_type_rlike = "";
     if (sql_types != "") {
-        sql_type_rlike = "and type rlike '^[" + sql_types + "]$' ";
+        if (sql_types.match(/[1-6]/) == null) {
+            sql_type_rlike = "and type rlike '^[" + sql_types + "]$' ";
+        }
+        else {
+            if (sql_types.replace(/[h1-6]/g, "") == "") {
+                sql_type_rlike = "and subtype rlike '^h[" + sql_types.replace(/[^\d]/g, "") + "]$' ";
+            } else {
+                sql_type_rlike = "and (type rlike '^[" + sql_types.replace(/[h1-6]/g, "") + "]$' \
+or subtype rlike '^h[" + sql_types.replace(/[^\d]/g, "") + "]$') ";
+            }
+            sql_types = sql_types.replace(/[1-6]/g, "");
+        }
     }
     // 排序
     let sql_order_by = "order by case type";
@@ -123,6 +134,7 @@ function translateSearchInput(search_keywords) {
         "s": " when 's' then ",
     }
     if (sql_types != "") {
+        console.log("sql types:", sql_types)
         for (let i = 0; i < sql_types.length; i++) {
             sql_order_by += type_order[sql_types[i]] + i.toString();
         }
@@ -219,15 +231,15 @@ class SimpleSearch extends siyuan.Plugin {
 
     // 创建一个观察器实例并传入回调函数
     observer = new MutationObserver(openSearchCallback);
-	// 开始观察目标节点
-	observer.observe(target_node, observer_conf);
-	console.log("simple search start...")
+    // 开始观察目标节点
+    observer.observe(target_node, observer_conf);
+    console.log("simple search start...")
   }
   
   onunload() {
-	// 停止观察目标节点
+    // 停止观察目标节点
     observer.disconnect();
-	console.log("simple search plugin stop...")
+    console.log("simple search plugin stop...")
   }
 };
 
