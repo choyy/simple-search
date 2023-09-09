@@ -7,14 +7,14 @@ function translateSearchInput(search_keywords) {
     let input_text_items            = search_keywords.split(" ");
     let key_words                   = [];                          // 搜索关键词
     let excluded_key_words          = [];                          // 排除的关键词
-    let options                     = [];                          // 搜索选项
+    let options                     = "";                          // 搜索选项
     let if_options_exist            = false;
     let if_excluded_key_words_exist = false;
     for (let i = 0; i < input_text_items.length; i++) {
         if(input_text_items[i] == "" || input_text_items[i] == "-"){
             continue;
         } else if (input_text_items[i].match(/^-[kedhlptbsicm1-6]+$/) != null) { // k为当前文档搜索，e为扩展搜索，其他为块类型
-            options.push(input_text_items[i].substring(1, input_text_items[i].length));
+            options += input_text_items[i].substring(1, input_text_items[i].length);
             if_options_exist = true;
         }
         else if (input_text_items[i].match(/^-.+/) != null) {
@@ -26,7 +26,7 @@ function translateSearchInput(search_keywords) {
         }
     }
     if ((!if_options_exist) && (!if_excluded_key_words_exist)) {
-        return "-w" + search_keywords; // 仅有关键词是使用关键词查询
+        return "-w" + search_keywords; // 仅有关键词时使用关键词查询
     } else if ((!if_options_exist) && (if_excluded_key_words_exist)){
         let query_syntax = "-q";  // 仅有关键词和排除关键词是使用查询语法查询
         for (let i = 0; i < key_words.length; i++) {
@@ -54,8 +54,7 @@ function translateSearchInput(search_keywords) {
  when 'iframe' then 14\
  end, updated desc";
     // 判断是否扩展范围搜索，若是则直接返回扩展范围搜索的sql语句
-    for (let i = 0; i < options.length; i++) {
-        if (options[i].match(/e/) != null) {
+        if (options.match(/e/) != null) {
             let sql_extended_search = "select path from blocks where type ='d' ";
             let sql_content_like = "";
             for (let i = 0; i < key_words.length; i++) {
@@ -69,7 +68,6 @@ function translateSearchInput(search_keywords) {
                 sql_extended_search + ") and (" + sql_content_like.slice(0, -4) + ") and type not rlike '^[libs]$'" +
                 sql_default_order_by;
         }
-    }
 
     // 一般搜索模式
     // sql 首部分
@@ -92,18 +90,12 @@ function translateSearchInput(search_keywords) {
     }
     // 搜索类型
     let sql_current_doc = "";
-    for (let i = 0; i < options.length; i++) {
-        if (options[i].match(/k/) != null) { // 当前文档搜索
-            options[i] = options[i].replace(/k/g, "");
+        if (options.match(/k/) != null) { // 当前文档搜索
+            options = options.replace(/k/g, "");
             let current_doc_id = document.querySelector(".fn__flex-1.protyle:not(.fn__none)").childNodes[1].childNodes[0].getAttribute("data-node-id");
             sql_current_doc = "and path like'%" + current_doc_id + ".sy' ";
-            break;
         }
-    }
-    let sql_types = "";
-    for (let i = 0; i < options.length; i++) {
-        sql_types += options[i];
-    }
+    let sql_types = options;
     let sql_type_rlike = "";
     if (sql_types != "") {
         if (sql_types.match(/[1-6]/) == null) {
@@ -134,7 +126,6 @@ or subtype rlike '^h[" + sql_types.replace(/[^\d]/g, "") + "]$') ";
         "s": " when 's' then ",
     }
     if (sql_types != "") {
-        console.log("sql types:", sql_types)
         for (let i = 0; i < sql_types.length; i++) {
             sql_order_by += type_order[sql_types[i]] + i.toString();
         }
