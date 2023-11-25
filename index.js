@@ -13,7 +13,7 @@ function translateSearchInput(search_keywords) {
     for (let i = 0; i < input_text_items.length; i++) {
         if (input_text_items[i] == "" || input_text_items[i] == "-") {
             continue;
-        } else if (input_text_items[i].match(/^-[kedhlptbsicm1-6]+$/) != null) { // k为当前文档搜索，e为扩展搜索，其他为块类型
+        } else if (input_text_items[i].match(/^-[kKedhlptbsicm1-6]+$/) != null) { // k为当前文档搜索，e为扩展搜索，其他为块类型
             options += input_text_items[i].substring(1, input_text_items[i].length);
             if_options_exist = true;
         }
@@ -65,7 +65,7 @@ function translateSearchInput(search_keywords) {
             sql_extended_search += "and path not in (select path from blocks where content like '%" + excluded_key_words[i] + "%') ";
         }
         return "-s" + "select * from blocks where path in (" +
-            sql_extended_search + ") and (" + sql_content_like.slice(0, -4) + ") and type not rlike '^[libs]$'" +
+            sql_extended_search + ") and (" + sql_content_like.slice(0, -4) + ") and type not rlike '^[libs]$'" + // l i b s块类型不是叶子节点，重复
             sql_default_order_by;
     }
 
@@ -90,11 +90,15 @@ function translateSearchInput(search_keywords) {
     }
     // 搜索类型
     let sql_current_doc = "";
-    if (options.match(/k/) != null) { // 当前文档搜索
-        options = options.replace(/k/g, "");
+    if (options.match(/[kK]/) != null) {  // 当前文档或带子文档搜索
         let current_doc_id = document.querySelector(".fn__flex-1.protyle:not(.fn__none)").childNodes[1].childNodes[0].getAttribute("data-node-id");
-        sql_current_doc = "and path like'%" + current_doc_id + ".sy' ";
-    }
+        if (options.match(/K/) != null) { // 在当前文档及子文档搜索
+            sql_current_doc = "and path rlike '" + current_doc_id + "' ";
+        } else {                          // 在当前文档搜索
+            sql_current_doc = "and path like '%" + current_doc_id + ".sy' ";
+        }
+        options = options.replace(/[kK]/g, "");
+    } 
     let sql_types = options;
     let sql_type_rlike = "";
     if (sql_types != "") {
