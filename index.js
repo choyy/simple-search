@@ -217,22 +217,21 @@ class SimpleSearch extends siyuan.Plugin {
         }.bind(this);
         const openSearchCallback = function (mutationsList) {
             for (let i = 0; i < mutationsList.length; i++) {
-                console.log("opensearch call back ", i,mutationsList[i].addedNodes[0] )
-                // console.log( mutationsList[i].addedNodes[0].className == "fn__flex-1 fn__flex")
-                // console.log( mutationsList[i].addedNodes[0].innerText)
-                // console.log( mutationsList[i].addedNodes[0].innerText == "搜索\n包含子文档")
-                if (mutationsList[i].addedNodes.length > 0 &&
-                    (mutationsList[i].addedNodes[0].getAttribute('data-key') == window.siyuan.config.keymap.general.globalSearch.custom // 判断全局搜索
-                        || (mutationsList[i].addedNodes[0].className == "fn__flex-1 fn__flex" &&
-                            mutationsList[i].addedNodes[0].innerText == "搜索\n包含子文档")
-                    )                       // 判断搜索页签
-                ) {
-                    operationsAfterOpenSearch();
+                if (mutationsList[i].addedNodes.length == 0) return;
+                if (mutationsList[i].addedNodes[0].getAttribute('data-key') == window.siyuan.config.keymap.general.globalSearch.custom) {// 判断全局搜索
+                    operationsAfterOpenSearch(); 
+                    document.querySelector("#searchOpen").onclick = function(){
+                        this.saveData("simple_search_keywords", search_keywords); // 保存查询关键词
+                    }.bind(this);
                     break;
+                } else if (mutationsList[i].addedNodes[0].className == "fn__flex-1 fn__flex"  // 判断搜索页签
+                    && mutationsList[i].addedNodes[0].innerText == "搜索\n包含子文档") {
+                    operationsAfterOpenSearch(); break;
                 } else {
                     if (typeof (search_keywords) !== 'undefined' && search_keywords !== "" && if_search_keywords_changed) {
                         this.saveData("simple_search_keywords", search_keywords); // 保存查询关键词
                         if_search_keywords_changed = false;
+                        break;
                     }
                 }
             }
