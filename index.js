@@ -154,67 +154,81 @@ let observer;
 class SimpleSearch extends siyuan.Plugin {
     onload() {
         // 选择需要观察变动的节点
-        const target_node = document.querySelector('body');
+        const global_search_node = document.querySelector("body");
+        const tab_search_node = document.querySelector(".layout__center");
         // 监视子节点的增减
-        const observer_conf = { childList: true };
+        const observer_conf = { childList: true, subtree: false };
         // 当观察到变动时执行的回调函数
         // 即当搜索界面打开时，插入新搜索框，隐藏原搜索框，然后将新搜索框内容转成sql后填入原搜索框
         const input_event = new InputEvent("input");
         let search_keywords = "";
         let if_search_keywords_changed = false;
+        const operationsAfterOpenSearch = function () {
+            last_search_method = -1; // 每次打开搜索都要设置搜索方法
+            // 插入新搜索框，隐藏原搜索框
+            let originalSearchInput = document.getElementById("searchInput");
+            let simpleSearchInput = originalSearchInput.cloneNode();
+            simpleSearchInput.id = "simpleSearchInput";
+            simpleSearchInput.value = "";
+            originalSearchInput.before(simpleSearchInput);
+            originalSearchInput.style.display = "none";
+            const input_event_func = function () {
+                search_keywords = simpleSearchInput.value;
+                if_search_keywords_changed = true;
+                if (search_keywords.length < 2) {
+                    switchSearchMethod(0);
+                    originalSearchInput.value = search_keywords;
+                } else {
+                    let input_translated = translateSearchInput(search_keywords);
+                    switch (input_translated.substring(0, 2)) {
+                        case "-w": switchSearchMethod(0); break;
+                        case "-q": switchSearchMethod(1); break;
+                        case "-s": switchSearchMethod(2); break;
+                        case "-r": switchSearchMethod(3); break;
+                    }
+                    originalSearchInput.value = input_translated.slice(2, input_translated.length);
+                }
+                originalSearchInput.dispatchEvent(input_event);
+            }
+            const keyboard_event_func = function (event) {
+                switch (event.keyCode) {
+                    case 13:
+                        originalSearchInput.dispatchEvent(new KeyboardEvent("keydown", { "keyCode": 13, "code": "KeyEnter", "key": "Enter" }));
+                        break;
+                    case 38:
+                        originalSearchInput.dispatchEvent(new KeyboardEvent("keydown", { "keyCode": 38, "code": "KeyArrowUp", "key": "ArrowUp" }));
+                        return false; // 禁用方向键原跳到行首功能
+                    case 40:
+                        originalSearchInput.dispatchEvent(new KeyboardEvent("keydown", { "keyCode": 40, "code": "KeyArrowDown", "key": "ArrowDown" }));
+                        return false; // 禁用方向键原跳到行尾功能
+                }
+            }
+            this.loadData("simple_search_keywords").then((data) => {
+                simpleSearchInput.value = data;
+                input_event_func();
+                simpleSearchInput.focus();  // 聚焦到输入框
+                simpleSearchInput.select(); // 选择框内内容
+
+                // 当在输入框中按下键的时候，将搜索框内容转成sql后填入原搜索框
+                search_keywords = simpleSearchInput.value;
+                simpleSearchInput.oninput = input_event_func; // 监听input事件
+                simpleSearchInput.onkeydown = keyboard_event_func; // enter键打开搜索结果，上下键选择
+            });
+        }.bind(this);
         const openSearchCallback = function (mutationsList) {
             for (let i = 0; i < mutationsList.length; i++) {
-                if (mutationsList[i].addedNodes.length > 0 && mutationsList[i].addedNodes[0].getAttribute('data-key') == window.siyuan.config.keymap.general.globalSearch.custom) {
-                    last_search_method = -1; // 每次打开搜索都要设置搜索方法
-                    // 插入新搜索框，隐藏原搜索框
-                    let originalSearchInput = mutationsList[i].addedNodes[0].getElementsByClassName('b3-text-field b3-text-field--text')[0];
-                    let simpleSearchInput = originalSearchInput.cloneNode();
-                    simpleSearchInput.id = "simpleSearchInput";
-                    simpleSearchInput.value = "";
-                    originalSearchInput.before(simpleSearchInput);
-                    originalSearchInput.style.display = "none";
-                    const input_event_func = function () {
-                        search_keywords = simpleSearchInput.value;
-                        if_search_keywords_changed = true;
-                        if (search_keywords.length < 2) {
-                            switchSearchMethod(0);
-                            originalSearchInput.value = search_keywords;
-                        } else {
-                            let input_translated = translateSearchInput(search_keywords);
-                            switch (input_translated.substring(0, 2)) {
-                                case "-w": switchSearchMethod(0); break;
-                                case "-q": switchSearchMethod(1); break;
-                                case "-s": switchSearchMethod(2); break;
-                                case "-r": switchSearchMethod(3); break;
-                            }
-                            originalSearchInput.value = input_translated.slice(2, input_translated.length);
-                        }
-                        originalSearchInput.dispatchEvent(input_event);
-                    }
-                    const keyboard_event_func = function (event) {
-                        switch (event.keyCode) {
-                            case 13:
-                                originalSearchInput.dispatchEvent(new KeyboardEvent("keydown", { "keyCode": 13, "code": "KeyEnter", "key": "Enter" }));
-                                break;
-                            case 38:
-                                originalSearchInput.dispatchEvent(new KeyboardEvent("keydown", { "keyCode": 38, "code": "KeyArrowUp", "key": "ArrowUp" }));
-                                return false; // 禁用方向键原跳到行首功能
-                            case 40:
-                                originalSearchInput.dispatchEvent(new KeyboardEvent("keydown", { "keyCode": 40, "code": "KeyArrowDown", "key": "ArrowDown" }));
-                                return false; // 禁用方向键原跳到行尾功能
-                        }
-                    }
-                    this.loadData("simple_search_keywords").then((data) => {
-                        simpleSearchInput.value = data;
-                        input_event_func();
-                        simpleSearchInput.focus();  // 聚焦到输入框
-                        simpleSearchInput.select(); // 选择框内内容
-
-                        // 当在输入框中按下键的时候，将搜索框内容转成sql后填入原搜索框
-                        search_keywords = simpleSearchInput.value;
-                        simpleSearchInput.oninput = input_event_func; // 监听input事件
-                        simpleSearchInput.onkeydown = keyboard_event_func; // enter键打开搜索结果，上下键选择
-                    });
+                console.log("opensearch call back ", i,mutationsList[i].addedNodes[0] )
+                // console.log( mutationsList[i].addedNodes[0].className == "fn__flex-1 fn__flex")
+                // console.log( mutationsList[i].addedNodes[0].innerText)
+                // console.log( mutationsList[i].addedNodes[0].innerText == "搜索\n包含子文档")
+                if (mutationsList[i].addedNodes.length > 0 &&
+                    (mutationsList[i].addedNodes[0].getAttribute('data-key') == window.siyuan.config.keymap.general.globalSearch.custom // 判断全局搜索
+                        || (mutationsList[i].addedNodes[0].className == "fn__flex-1 fn__flex" &&
+                            mutationsList[i].addedNodes[0].innerText == "搜索\n包含子文档")
+                    )                       // 判断搜索页签
+                ) {
+                    operationsAfterOpenSearch();
+                    break;
                 } else {
                     if (typeof (search_keywords) !== 'undefined' && search_keywords !== "" && if_search_keywords_changed) {
                         this.saveData("simple_search_keywords", search_keywords); // 保存查询关键词
@@ -227,7 +241,8 @@ class SimpleSearch extends siyuan.Plugin {
         // 创建一个观察器实例并传入回调函数
         observer = new MutationObserver(openSearchCallback);
         // 开始观察目标节点
-        observer.observe(target_node, observer_conf);
+        observer.observe(global_search_node, observer_conf);
+        observer.observe(tab_search_node, observer_conf);
         console.log("simple search start...")
     }
 
