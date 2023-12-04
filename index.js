@@ -152,7 +152,7 @@ function switchSearchMethod(i) {
 
 let observer;
 class SimpleSearch extends siyuan.Plugin {
-    onload() {
+    onLayoutReady() {
         // 选择需要观察变动的节点
         const global_search_node = document.querySelector("body");
         const tab_search_node = document.querySelector(".layout__center");

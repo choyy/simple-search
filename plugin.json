@@ -2,7 +2,7 @@
   "name": "Simple Search",
   "author": "chooyy",
   "url": "https://github.com/choyy/simple-search",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "minAppVersion": "2.8.0",
   "backends": ["windows", "linux", "darwin", "docker"],
   "frontends": ["desktop", "desktop-window", "browser-desktop"],
