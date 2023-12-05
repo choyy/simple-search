@@ -157,7 +157,7 @@ class SimpleSearch extends siyuan.Plugin {
         const global_search_node = document.querySelector("body");
         const tab_search_node = document.querySelector(".layout__center");
         // 监视子节点的增减
-        const observer_conf = { childList: true, subtree: false };
+        const observer_conf = { childList: true };
         // 当观察到变动时执行的回调函数
         // 即当搜索界面打开时，插入新搜索框，隐藏原搜索框，然后将新搜索框内容转成sql后填入原搜索框
         const input_event = new InputEvent("input");
@@ -170,8 +170,12 @@ class SimpleSearch extends siyuan.Plugin {
             let simpleSearchInput = originalSearchInput.cloneNode();
             simpleSearchInput.id = "simpleSearchInput";
             simpleSearchInput.value = "";
-            originalSearchInput.before(simpleSearchInput);
-            originalSearchInput.style.display = "none";
+            originalSearchInput.after(simpleSearchInput);
+            originalSearchInput.style = "width: 0; position: fixed; visibility: hidden;";
+            simpleSearchInput.nextSibling.onclick = function () { // 设置清空按钮
+                simpleSearchInput.value = "";
+                simpleSearchInput.focus();
+            }
             const input_event_func = function () {
                 search_keywords = simpleSearchInput.value;
                 if_search_keywords_changed = true;
@@ -225,7 +229,7 @@ class SimpleSearch extends siyuan.Plugin {
                     }.bind(this);
                     break;
                 } else if (mutationsList[i].addedNodes[0].className == "fn__flex-1 fn__flex"  // 判断搜索页签
-                    && mutationsList[i].addedNodes[0].innerText == "搜索\n包含子文档") {
+                    && mutationsList[i].addedNodes[0].innerText == "搜索") {
                     operationsAfterOpenSearch(); break;
                 } else {
                     if (typeof (search_keywords) !== 'undefined' && search_keywords !== "" && if_search_keywords_changed) {
