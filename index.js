@@ -13,7 +13,7 @@ function translateSearchInput(search_keywords) {
     for (let i = 0; i < input_text_items.length; i++) {
         if (input_text_items[i] == "" || input_text_items[i] == "-") {
             continue;
-        } else if (input_text_items[i].match(/^-[kKedhlptbsicm1-6]+$/) != null) { // k为当前文档搜索，e为扩展搜索，其他为块类型
+        } else if (input_text_items[i].match(/^-[kKedhlptbsicmoO1-6]+$/) != null) { // k为当前文档搜索，e为扩展搜索，其他为块类型
             options += input_text_items[i].substring(1, input_text_items[i].length);
             if_options_exist = true;
         }
@@ -99,22 +99,29 @@ function translateSearchInput(search_keywords) {
         }
         options = options.replace(/[kK]/g, "");
     } 
-    let sql_types = options;
-    let sql_type_rlike = "";
-    if (sql_types != "") {
-        if (sql_types.match(/[1-6]/) == null) {
-            sql_type_rlike = "and type rlike '^[" + sql_types + "]$' ";
-        }
-        else {
-            if (sql_types.replace(/[h1-6]/g, "") == "") {
-                sql_type_rlike = "and subtype rlike '^h[" + sql_types.replace(/[^\d]/g, "") + "]$' ";
-            } else {
-                sql_type_rlike = "and (type rlike '^[" + sql_types.replace(/[h1-6]/g, "") + "]$' \
-or subtype rlike '^h[" + sql_types.replace(/[^\d]/g, "") + "]$') ";
-            }
-            sql_types = sql_types.replace(/[1-6]/g, "");
-        }
+    let sql_types          = options;
+    let sql_standard_types = sql_types.replace(/[oO1-6]/g, "");       // 思源标准块类型
+    let sql_special_types  = sql_types.replace(/[dhlptbsicm]/g, "");  // 特殊类型
+    let sql_type_rlike     = "";                                      // sql筛选块的语句
+    if (sql_standard_types != "") {                  // 标准类型的sql语句
+        sql_type_rlike += "type rlike '^[" + sql_standard_types + "]$' ";
     }
+    if (sql_special_types.match(/[1-6]/g) != null) { // 搜索子标题的sql语句
+        if (sql_type_rlike != "") sql_type_rlike += "or ";
+        sql_type_rlike += "subtype rlike '^h[" + sql_special_types.replace(/[^\d]/g, "") + "]$' ";
+    }
+    if (sql_special_types.match(/[oO]/g) != null) {  // 搜索待办的sql语句
+        if (sql_type_rlike != "") sql_type_rlike += "or ";
+        let todo_type = "";
+        if (sql_special_types.match(/o/g) != null && sql_special_types.match(/O/g) == null) {
+            todo_type = "and markdown like '%[ ] %'"
+        } else if (sql_special_types.match(/O/g) != null && sql_special_types.match(/o/g) == null) {
+            todo_type = "and markdown like '%[x] %'"
+        }
+        sql_type_rlike += "(subtype like 't' and type not like 'l' " + todo_type + ") ";
+    }
+    sql_type_rlike = "and (" + sql_type_rlike + ") ";
+    sql_types = sql_types.replace(/[oO1-6]/g, "");
     // 排序
     let sql_order_by = "order by case type";
     const type_order = {
