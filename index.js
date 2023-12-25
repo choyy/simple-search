@@ -65,7 +65,7 @@ function translateSearchInput(search_keywords) {
             sql_extended_search += "and path not in (select path from blocks where content like '%" + excluded_key_words[i] + "%') ";
         }
         return "-s" + "select * from blocks where path in (" +
-            sql_extended_search + ") and (" + sql_content_like.slice(0, -4) + ") and type not rlike '^[libs]$'" + // l i b s块类型不是叶子节点，重复
+            sql_extended_search + ") and (" + sql_content_like.slice(0, -4) + ") and type not rlike '^[libs]$' " + // l i b s块类型不是叶子节点，重复
             sql_default_order_by;
     }
 
@@ -156,8 +156,21 @@ let last_search_method = -1;
 function switchSearchMethod(i) {
     if (last_search_method != i) {
         document.querySelector("#searchSyntaxCheck").click();
-        document.querySelector("#commonMenu").lastChild.childNodes[i].click();
+        document.querySelector("#commonMenu").lastChild.children[i].click();
         last_search_method = i;
+    }
+}
+
+let changed_user_group_by = false;       // 记录是否切换过分组
+function changeGroupBy(i){               // i = 0 不分组，i = 1 按文档分组
+    if (i == 0 && changed_user_group_by && window.siyuan.storage['local-searchdata'].group == 0) {         // 若分组被切换过，且默认不分组，则切换不分组
+        document.getElementById("searchMore").click();
+        document.querySelector("#commonMenu").lastChild.children[1].children[2].firstChild.firstChild.click();
+        changed_user_group_by = false;
+    } else if (i == 1 && !changed_user_group_by && window.siyuan.storage['local-searchdata'].group == 0) { // 若分组没切换过，且默认不分组，则按文档分组
+        document.getElementById("searchMore").click();
+        document.querySelector("#commonMenu").lastChild.children[1].children[2].firstChild.lastChild.click();
+        changed_user_group_by = true;
     }
 }
 
@@ -202,6 +215,12 @@ class SimpleSearch extends siyuan.Plugin {
                         case "-r": switchSearchMethod(3); break;
                     }
                     originalSearchInput.value = input_translated.slice(2, input_translated.length);
+                    if (input_translated.substring(0, 2) == "-s"
+                        && input_translated.match(/'\^\[libs\]\$'/g) != null) { // 若是扩展搜索，按文档分组
+                        changeGroupBy(1);
+                    } else { // 否则切换默认分组
+                        changeGroupBy(0);
+                    }
                 }
                 originalSearchInput.dispatchEvent(input_event);
             }
