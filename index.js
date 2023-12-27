@@ -252,7 +252,7 @@ class SimpleSearch extends siyuan.Plugin {
         const openSearchCallback = function (mutationsList) {
             for (let i = 0; i < mutationsList.length; i++) {
                 if (mutationsList[i].addedNodes.length == 0) return;
-                if (mutationsList[i].addedNodes[0].getAttribute('data-key') == window.siyuan.config.keymap.general.globalSearch.custom) {// 判断全局搜索
+                if (mutationsList[i].addedNodes[0].getAttribute('data-key') == "dialog-globalsearch") {// 判断全局搜索
                     operationsAfterOpenSearch(); 
                     document.querySelector("#searchOpen").onclick = function(){
                         this.saveData("simple_search_keywords", search_keywords); // 保存查询关键词
