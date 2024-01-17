@@ -3,8 +3,8 @@
   "author": "chooyy",
   "url": "https://github.com/choyy/simple-search",
   "version": "0.1.1",
-  "minAppVersion": "2.8.0",
-  "backends": ["windows", "linux", "darwin", "docker"],
+  "minAppVersion": "2.11.4",
+  "backends": ["all"],
   "frontends": ["desktop", "desktop-window", "browser-desktop"],
   "displayName": {
     "default": "Simple Search",
