@@ -161,24 +161,24 @@ function switchSearchMethod(i) {
     }
 }
 
-let changed_user_group_by = false;       // 记录是否切换过分组
+let g_changed_user_groupby = false;       // 记录是否切换过分组
 function changeGroupBy(i){               // i = 0 不分组，i = 1 按文档分组
-    if (i == 0 && changed_user_group_by && window.siyuan.storage['local-searchdata'].group == 0) {         // 若分组被切换过，且默认不分组，则切换不分组
+    if (i == 0 && g_changed_user_groupby && window.siyuan.storage['local-searchdata'].group == 0) {         // 若分组被切换过，且默认不分组，则切换不分组
         document.getElementById("searchMore").click();
         document.querySelector("#commonMenu").lastChild.children[1].children[2].firstChild.firstChild.click();
-        changed_user_group_by = false;
-    } else if (i == 1 && !changed_user_group_by && window.siyuan.storage['local-searchdata'].group == 0) { // 若分组没切换过，且默认不分组，则按文档分组
+        g_changed_user_groupby = false;
+    } else if (i == 1 && !g_changed_user_groupby && window.siyuan.storage['local-searchdata'].group == 0) { // 若分组没切换过，且默认不分组，则按文档分组
         document.getElementById("searchMore").click();
         document.querySelector("#commonMenu").lastChild.children[1].children[2].firstChild.lastChild.click();
-        changed_user_group_by = true;
+        g_changed_user_groupby = true;
     }
 }
 
-let observer;
-let search_keywords = "";
+let g_observer;
+let g_search_keywords = "";
 class SimpleSearch extends siyuan.Plugin {
     inputSearchEvent() { // 保存关键词，确保思源搜索关键词为输入的关键词，而不是翻译后的sql语句
-        window.siyuan.storage["local-searchdata"].k = search_keywords;
+        window.siyuan.storage["local-searchdata"].k = g_search_keywords;
     }
     onLayoutReady() {
         // 选择需要观察变动的节点
@@ -189,7 +189,6 @@ class SimpleSearch extends siyuan.Plugin {
         // 当观察到变动时执行的回调函数
         // 即当搜索界面打开时，插入新搜索框，隐藏原搜索框，然后将新搜索框内容转成sql后填入原搜索框
         const input_event = new InputEvent("input");
-        let if_search_keywords_changed = false;
         const operationsAfterOpenSearch = function () {
             last_search_method = -1; // 每次打开搜索都要设置搜索方法
             // 插入新搜索框，隐藏原搜索框
@@ -204,13 +203,12 @@ class SimpleSearch extends siyuan.Plugin {
                 simpleSearchInput.focus();
             }
             const input_event_func = function () {
-                search_keywords = simpleSearchInput.value;
-                if_search_keywords_changed = true;
-                if (search_keywords.length < 2) {
+                g_search_keywords = simpleSearchInput.value;
+                if (g_search_keywords.length < 2) {
                     switchSearchMethod(0);
-                    originalSearchInput.value = search_keywords;
+                    originalSearchInput.value = g_search_keywords;
                 } else {
-                    let input_translated = translateSearchInput(search_keywords);
+                    let input_translated = translateSearchInput(g_search_keywords);
                     switch (input_translated.substring(0, 2)) {
                         case "-w": switchSearchMethod(0); break;
                         case "-q": switchSearchMethod(1); break;
@@ -241,13 +239,13 @@ class SimpleSearch extends siyuan.Plugin {
                 }
             }
 
-            simpleSearchInput.value = originalSearchInput.value; // 1、原搜索框关键词为保存的search_keywords  2、确保点击标签搜索时不被影响
+            simpleSearchInput.value = originalSearchInput.value; // 1、原搜索框关键词为保存的g_search_keywords  2、确保点击标签搜索时不被影响
             input_event_func();
             simpleSearchInput.focus();  // 聚焦到输入框
             simpleSearchInput.select(); // 选择框内内容
 
             // 当在输入框中按下按键的时候，将搜索框内容转成sql后填入原搜索框
-            search_keywords = simpleSearchInput.value;
+            g_search_keywords = simpleSearchInput.value;
             simpleSearchInput.oninput = input_event_func; // 监听input事件
             simpleSearchInput.onkeydown = keyboard_event_func; // enter键打开搜索结果，上下键选择
         }.bind(this);
@@ -257,7 +255,7 @@ class SimpleSearch extends siyuan.Plugin {
                 if (mutationsList[i].addedNodes[0].getAttribute('data-key') == "dialog-globalsearch") {// 判断全局搜索
                     operationsAfterOpenSearch(); 
                     document.querySelector("#searchOpen").onclick = function () { // 确保按下在页签打开时搜索关键词不变
-                        document.getElementById("searchInput").value = search_keywords;
+                        document.getElementById("searchInput").value = g_search_keywords;
                     }.bind(this);
                     break;
                 } else if (mutationsList[i].addedNodes[0].className == "fn__flex-1 fn__flex"  // 判断搜索页签
@@ -270,17 +268,18 @@ class SimpleSearch extends siyuan.Plugin {
         this.eventBus.on("input-search", this.inputSearchEvent);
 
         // 创建一个观察器实例并传入回调函数
-        observer = new MutationObserver(openSearchCallback);
+        g_observer = new MutationObserver(openSearchCallback);
         // 开始观察目标节点
-        observer.observe(global_search_node, observer_conf);
-        observer.observe(tab_search_node, observer_conf);
+        g_observer.observe(global_search_node, observer_conf);
+        g_observer.observe(tab_search_node, observer_conf);
         console.log("simple search start...")
     }
 
     onunload() {
         // 停止观察目标节点
-        observer.disconnect();
-        console.log("simple search plugin stop...")
+        g_observer.disconnect();
+        this.eventBus.off("input-search", this.inputSearchEvent);
+        console.log("simple search stop...")
     }
 };
 
