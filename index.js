@@ -175,7 +175,11 @@ function changeGroupBy(i){               // i = 0 不分组，i = 1 按文档分
 }
 
 let observer;
+let search_keywords = "";
 class SimpleSearch extends siyuan.Plugin {
+    inputSearchEvent() { // 保存关键词，确保思源搜索关键词为输入的关键词，而不是翻译后的sql语句
+        window.siyuan.storage["local-searchdata"].k = search_keywords;
+    }
     onLayoutReady() {
         // 选择需要观察变动的节点
         const global_search_node = document.querySelector("body");
@@ -185,7 +189,6 @@ class SimpleSearch extends siyuan.Plugin {
         // 当观察到变动时执行的回调函数
         // 即当搜索界面打开时，插入新搜索框，隐藏原搜索框，然后将新搜索框内容转成sql后填入原搜索框
         const input_event = new InputEvent("input");
-        let search_keywords = "";
         let if_search_keywords_changed = false;
         const operationsAfterOpenSearch = function () {
             last_search_method = -1; // 每次打开搜索都要设置搜索方法
@@ -237,39 +240,34 @@ class SimpleSearch extends siyuan.Plugin {
                         return false; // 禁用方向键原跳到行尾功能
                 }
             }
-            this.loadData("simple_search_keywords").then((data) => {
-                simpleSearchInput.value = data;
-                input_event_func();
-                simpleSearchInput.focus();  // 聚焦到输入框
-                simpleSearchInput.select(); // 选择框内内容
 
-                // 当在输入框中按下键的时候，将搜索框内容转成sql后填入原搜索框
-                search_keywords = simpleSearchInput.value;
-                simpleSearchInput.oninput = input_event_func; // 监听input事件
-                simpleSearchInput.onkeydown = keyboard_event_func; // enter键打开搜索结果，上下键选择
-            });
+            simpleSearchInput.value = originalSearchInput.value; // 1、原搜索框关键词为保存的search_keywords  2、确保点击标签搜索时不被影响
+            input_event_func();
+            simpleSearchInput.focus();  // 聚焦到输入框
+            simpleSearchInput.select(); // 选择框内内容
+
+            // 当在输入框中按下按键的时候，将搜索框内容转成sql后填入原搜索框
+            search_keywords = simpleSearchInput.value;
+            simpleSearchInput.oninput = input_event_func; // 监听input事件
+            simpleSearchInput.onkeydown = keyboard_event_func; // enter键打开搜索结果，上下键选择
         }.bind(this);
         const openSearchCallback = function (mutationsList) {
             for (let i = 0; i < mutationsList.length; i++) {
                 if (mutationsList[i].addedNodes.length == 0) return;
                 if (mutationsList[i].addedNodes[0].getAttribute('data-key') == "dialog-globalsearch") {// 判断全局搜索
                     operationsAfterOpenSearch(); 
-                    document.querySelector("#searchOpen").onclick = function(){
-                        this.saveData("simple_search_keywords", search_keywords); // 保存查询关键词
+                    document.querySelector("#searchOpen").onclick = function () { // 确保按下在页签打开时搜索关键词不变
+                        document.getElementById("searchInput").value = search_keywords;
                     }.bind(this);
                     break;
                 } else if (mutationsList[i].addedNodes[0].className == "fn__flex-1 fn__flex"  // 判断搜索页签
                     && mutationsList[i].addedNodes[0].innerText == "搜索") {
                     operationsAfterOpenSearch(); break;
-                } else {
-                    if (typeof (search_keywords) !== 'undefined' && search_keywords !== "" && if_search_keywords_changed) {
-                        this.saveData("simple_search_keywords", search_keywords); // 保存查询关键词
-                        if_search_keywords_changed = false;
-                        break;
-                    }
-                }
+                } 
             }
         }.bind(this);
+
+        this.eventBus.on("input-search", this.inputSearchEvent);
 
         // 创建一个观察器实例并传入回调函数
         observer = new MutationObserver(openSearchCallback);
