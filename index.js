@@ -152,12 +152,12 @@ function translateSearchInput(search_keywords) {
     // 完整sql语句
     return "-s" + sql_prefix + sql_key_words + sql_type_rlike + sql_current_doc + sql_order_by;
 }
-let last_search_method = -1;
+let g_last_search_method = -1;
 function switchSearchMethod(i) {
-    if (last_search_method != i) {
+    if (g_last_search_method != i) {
         document.querySelector("#searchSyntaxCheck").click();
         document.querySelector("#commonMenu").lastChild.children[i].click();
-        last_search_method = i;
+        g_last_search_method = i;
     }
 }
 
@@ -178,6 +178,13 @@ let g_observer;
 let g_search_keywords = "";
 class SimpleSearch extends siyuan.Plugin {
     inputSearchEvent() { // 保存关键词，确保思源搜索关键词为输入的关键词，而不是翻译后的sql语句
+        if (/^#.*#$/.test(document.getElementById("searchInput").value)  // 多次点击标签搜索时更新搜索框关键词
+            && document.getElementById("searchInput").value != document.getElementById("simpleSearchInput").value) {
+            document.getElementById("simpleSearchInput").value = document.getElementById("searchInput").value;
+            document.getElementById("simpleSearchInput").focus();  // 聚焦到输入框
+            document.getElementById("simpleSearchInput").select(); // 选择框内内容
+            g_search_keywords = document.getElementById("searchInput").value;
+        }
         window.siyuan.storage["local-searchdata"].k = g_search_keywords;
     }
     onLayoutReady() {
@@ -190,7 +197,7 @@ class SimpleSearch extends siyuan.Plugin {
         // 即当搜索界面打开时，插入新搜索框，隐藏原搜索框，然后将新搜索框内容转成sql后填入原搜索框
         const input_event = new InputEvent("input");
         const operationsAfterOpenSearch = function () {
-            last_search_method = -1; // 每次打开搜索都要设置搜索方法
+            g_last_search_method = -1; // 每次打开搜索都要设置搜索方法
             // 插入新搜索框，隐藏原搜索框
             let originalSearchInput = document.getElementById("searchInput");
             let simpleSearchInput = originalSearchInput.cloneNode();
