@@ -1,3 +1,11 @@
 #searchSyntaxCheck {
 	display: none
 }
+::highlight(highlight-keywords-search-list) {
+    background-color: var(--b3-protyle-inline-mark-background);
+    color: var(--b3-protyle-inline-mark-color);
+}
+::highlight(highlight-keywords-search-preview) {
+    background-color: var(--b3-theme-primary-lighter);
+    box-shadow: 0 0 0 0.5px var(--b3-theme-on-background);
+}

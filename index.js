@@ -1,5 +1,6 @@
 const siyuan = require("siyuan");
 
+let g_keywords = [];
 function translateSearchInput(search_keywords) {
     if (search_keywords.length < 2 || search_keywords.match("^-[wqrs]") != null) {
         return search_keywords;
@@ -25,6 +26,7 @@ function translateSearchInput(search_keywords) {
             key_words.push(input_text_items[i]);
         }
     }
+    g_keywords = key_words;
     if ((!if_options_exist) && (!if_excluded_key_words_exist)) {
         return "-w" + search_keywords; // 仅有关键词时使用关键词查询
     } else if ((!if_options_exist) && (if_excluded_key_words_exist)) {
@@ -161,7 +163,7 @@ function switchSearchMethod(i) {
     }
 }
 
-let g_changed_user_groupby = false;       // 记录是否切换过分组
+let g_changed_user_groupby = false;      // 记录是否切换过分组
 function changeGroupBy(i){               // i = 0 不分组，i = 1 按文档分组
     if (i == 0 && g_changed_user_groupby && window.siyuan.storage['local-searchdata'].group == 0) {         // 若分组被切换过，且默认不分组，则切换不分组
         document.getElementById("searchMore").click();
@@ -174,8 +176,33 @@ function changeGroupBy(i){               // i = 0 不分组，i = 1 按文档分
     }
 }
 
+function highlightKeywords(search_list_text_nodes, keyword, highlight_type) {
+    const str = keyword.trim().toLowerCase();
+    const ranges = search_list_text_nodes // 查找所有文本节点是否包含搜索词
+        .map((el) => {
+            const text = el.textContent.toLowerCase();
+            const indices = [];
+            let startPos = 0;
+            while (startPos < text.length) {
+                const index = text.indexOf(str, startPos);
+                if (index === -1) break;
+                indices.push(index);
+                startPos = index + str.length;
+            }
+            return indices.map((index) => {
+                const range = document.createRange();
+                range.setStart(el, index);
+                range.setEnd(el, index + str.length);
+                return range;
+            });
+        });
+    const searchResultsHighlight = new Highlight(...ranges.flat()); // 创建高亮对象
+    CSS.highlights.set(highlight_type, searchResultsHighlight);     // 注册高亮
+}
+
 let g_observer;
 let g_search_keywords = "";
+let g_highlight_keywords = false;
 class SimpleSearch extends siyuan.Plugin {
     inputSearchEvent() { // 保存关键词，确保思源搜索关键词为输入的关键词，而不是翻译后的sql语句
         if (/^#.*#$/.test(document.getElementById("searchInput").value)  // 多次点击标签搜索时更新搜索框关键词
@@ -186,6 +213,30 @@ class SimpleSearch extends siyuan.Plugin {
             g_search_keywords = document.getElementById("searchInput").value;
         }
         window.siyuan.storage["local-searchdata"].k = g_search_keywords;
+    }
+    loadedProtyleStaticEvent() {    // 在界面加载完毕后高亮关键词
+        CSS.highlights.clear();     // 清除上个高亮
+        if (g_highlight_keywords) { // 判断是否需要高亮关键词
+            const search_list = document.getElementById("searchList"); // 搜索结果列表的节点
+            if(search_list == null) return;                            // 判断是否存在搜索界面
+            const search_list_text_nodes = Array.from(search_list.querySelectorAll(".b3-list-item__text"), el => el.firstChild); // 获取所有具有 b3-list-item__text 类的节点的文本子节点
+            g_keywords.forEach((keyword) => {
+                highlightKeywords(search_list_text_nodes, keyword, "highlight-keywords-search-list");
+            });
+            const search_preview = document.getElementById("searchPreview").children[1].children[0]; // 搜索预览内容的节点
+            const tree_walker = document.createTreeWalker(search_preview, NodeFilter.SHOW_TEXT);     // 创建 createTreeWalker 迭代器，用于遍历文本节点，保存到一个数组
+            const search_preview_text_nodes = [];
+            let current_node = tree_walker.nextNode();
+            while (current_node) {
+                if (current_node.textContent.trim().length > 1) {
+                    search_preview_text_nodes.push(current_node);
+                }
+                current_node = tree_walker.nextNode();
+            }
+            g_keywords.forEach((keyword) => {
+                highlightKeywords(search_preview_text_nodes, keyword, "highlight-keywords-search-preview");
+            });
+        }
     }
     onLayoutReady() {
         // 选择需要观察变动的节点
@@ -210,6 +261,7 @@ class SimpleSearch extends siyuan.Plugin {
                 simpleSearchInput.focus();
             }
             const input_event_func = function () {
+                g_highlight_keywords = false;
                 g_search_keywords = simpleSearchInput.value;
                 if (g_search_keywords.length < 2) {
                     switchSearchMethod(0);
@@ -223,11 +275,13 @@ class SimpleSearch extends siyuan.Plugin {
                         case "-r": switchSearchMethod(3); break;
                     }
                     originalSearchInput.value = input_translated.slice(2, input_translated.length);
-                    if (input_translated.substring(0, 2) == "-s"
-                        && input_translated.match(/'\^\[libs\]\$'/g) != null) { // 若是扩展搜索，按文档分组
-                        changeGroupBy(1);
-                    } else { // 否则切换默认分组
-                        changeGroupBy(0);
+                    if (input_translated.substring(0, 2) == "-s") {
+                        g_highlight_keywords = true;
+                        if (input_translated.match(/'\^\[libs\]\$'/g) != null) { // 若是扩展搜索，按文档分组
+                            changeGroupBy(1);
+                        } else { // 否则切换默认分组
+                            changeGroupBy(0);
+                        }
                     }
                 }
                 originalSearchInput.dispatchEvent(input_event);
@@ -273,6 +327,7 @@ class SimpleSearch extends siyuan.Plugin {
         }.bind(this);
 
         this.eventBus.on("input-search", this.inputSearchEvent);
+        this.eventBus.on("loaded-protyle-static", this.loadedProtyleStaticEvent);
 
         // 创建一个观察器实例并传入回调函数
         g_observer = new MutationObserver(openSearchCallback);
@@ -286,6 +341,7 @@ class SimpleSearch extends siyuan.Plugin {
         // 停止观察目标节点
         g_observer.disconnect();
         this.eventBus.off("input-search", this.inputSearchEvent);
+        this.eventBus.off("loaded-protyle-static", this.loadedProtyleStaticEvent);
         console.log("simple search stop...")
     }
 };
