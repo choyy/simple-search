@@ -93,7 +93,7 @@ function translateSearchInput(search_keywords) {
     // 搜索类型
     let sql_current_doc = "";
     if (options.match(/[kK]/) != null) {  // 当前文档或带子文档搜索
-        let current_doc_id = document.querySelector(".fn__flex-1.protyle:not(.fn__none)").childNodes[1].childNodes[0].getAttribute("data-node-id");
+        let current_doc_id = document.querySelector(".fn__flex-1.protyle:not(.fn__none)").childNodes[1].childNodes[0].childNodes[0].getAttribute("data-node-id");
         if (options.match(/K/) != null) { // 在当前文档及子文档搜索
             sql_current_doc = "and path rlike '" + current_doc_id + "' ";
         } else {                          // 在当前文档搜索
@@ -126,7 +126,9 @@ function translateSearchInput(search_keywords) {
         if (sql_type_rlike != "") sql_type_rlike += "or ";
         sql_type_rlike += "(type rlike '^[htp]$' and markdown like '%[%](%)%') ";
     }
-    sql_type_rlike = "and (" + sql_type_rlike + ") ";
+    if (sql_type_rlike != "") {
+        sql_type_rlike = "and (" + sql_type_rlike + ") ";
+    }
     sql_types = sql_types.replace(/[oOL1-6]/g, "");
     // 排序
     let sql_order_by = "order by case type";
@@ -164,7 +166,7 @@ function switchSearchMethod(i) {
 }
 
 let g_changed_user_groupby = false;      // 记录是否切换过分组
-function changeGroupBy(i){               // i = 0 不分组，i = 1 按文档分组
+function changeGroupBy(i){               // i = 0 默认分组，i = 1 按文档分组
     if (i == 0 && g_changed_user_groupby && window.siyuan.storage['local-searchdata'].group == 0) {         // 若分组被切换过，且默认不分组，则切换不分组
         document.getElementById("searchMore").click();
         document.querySelector("#commonMenu").lastChild.children[1].children[2].firstChild.firstChild.click();
