@@ -256,8 +256,7 @@ class SimpleSearch extends siyuan.Plugin {
             let simpleSearchInput = originalSearchInput.cloneNode();
             simpleSearchInput.id = "simpleSearchInput";
             simpleSearchInput.value = "";
-            originalSearchInput.after(simpleSearchInput);
-            originalSearchInput.style = "width: 0; position: fixed; visibility: hidden;";
+            originalSearchInput.before(simpleSearchInput);
             simpleSearchInput.nextSibling.onclick = function () { // 设置清空按钮
                 simpleSearchInput.value = "";
                 simpleSearchInput.focus();

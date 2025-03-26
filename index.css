@@ -1,6 +1,13 @@
 #searchSyntaxCheck {
 	display: none
 }
+#simpleSearchInput {
+    margin-right: -20%;
+    padding-left: 6.6% !important;
+}
+#searchInput {
+    width: 0px;
+}
 ::highlight(highlight-keywords-search-list) {
     background-color: var(--b3-protyle-inline-mark-background);
     color: var(--b3-protyle-inline-mark-color);
