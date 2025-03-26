@@ -2,7 +2,7 @@
   "name": "Simple Search",
   "author": "chooyy",
   "url": "https://github.com/choyy/simple-search",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "minAppVersion": "2.11.4",
   "backends": ["all"],
   "frontends": ["desktop", "desktop-window", "browser-desktop"],
@@ -20,7 +20,7 @@
   },
   "funding": {
     "custom": [
-      "https://afdian.net/a/chooyy"
+      "https://afdian.com/a/chooyy"
     ]
   }
 }

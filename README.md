@@ -94,14 +94,11 @@
 
 可在[【插件】简易搜索 - 更高效的搜索方式 - 链滴](https://ld246.com/article/1689344075636)或[Issues · choyy/simple-search](https://github.com/choyy/simple-search/issues)或某QQ群提交反馈或建议。
 
-# 7. 欢迎捐赠
+# 7. 更新日志
 
-![sponsor.png](https://b3logfile.com/file/2024/04/sponsor-YNjoOFi.png)
-
-# 8. 更新日志
-
+- v0.2.2，**未指定搜索类型时应选择设置中启用的块类型**
 - v0.2.1，修复bug
-- **v0.2.0，支持高亮搜索关键词**
+- v0.2.0，支持高亮搜索关键词
 - v0.1.3，继续修复点击标签搜索问题
 - v0.1.2，修复点击标签触发搜索时关键词不为标签的问题
 - v0.1.1，扩展搜索时自动按文档分组，适配 2.11.4
