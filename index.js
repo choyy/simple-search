@@ -1,14 +1,62 @@
 const siyuan = require("siyuan");
 
+const sql_default_order_by = "order by case type \
+ when 'd' then 1\
+ when 'h' then 2\
+ when 'i' then 3\
+ when 'p' then 4\
+ when 't' then 5\
+ when 'b' then 6\
+ when 'c' then 7\
+ when 'm' then 8\
+ when 'l' then 9\
+ when 's' then 10\
+ when 'html' then 11\
+ when 'widget' then 12\
+ when 'query_embed' then 13\
+ when 'iframe' then 14\
+ end, updated desc";
+const type_order = {
+    "d": " when 'd' then ",
+    "h": " when 'h' then ",
+    "i": " when 'i' then ",
+    "p": " when 'p' then ",
+    "t": " when 't' then ",
+    "b": " when 'b' then ",
+    "c": " when 'c' then ",
+    "m": " when 'm' then ",
+    "l": " when 'l' then ",
+    "s": " when 's' then ",
+}
+const type_mapping = { // 定义思源块类型映射关系
+    audioBlock: '',
+    blockquote: 'b',
+    codeBlock: 'c',
+    databaseBlock: '',
+    document: 'd',
+    embedBlock: '',
+    heading: 'h',
+    htmlBlock: '',
+    iframeBlock: '',
+    list: 'l',
+    listItem: 'i',
+    mathBlock: 'm',
+    paragraph: 'p',
+    superBlock: 's',
+    table: 't',
+    videoBlock: '',
+    widgetBlock: ''
+};
+
 let g_keywords = [];
 function translateSearchInput(search_keywords) {
     if (search_keywords.length < 2 || search_keywords.match("^-[wqrs]") != null) {
         return search_keywords;
     }
     let input_text_items            = search_keywords.split(" ");
-    let key_words                   = [];                          // 搜索关键词
-    let excluded_key_words          = [];                          // 排除的关键词
-    let options                     = "";                          // 搜索选项
+    let key_words                   = []; // 搜索关键词
+    let excluded_key_words          = []; // 排除的关键词
+    let options                     = ""; // 搜索选项
     let if_options_exist            = false;
     let if_excluded_key_words_exist = false;
     for (let i = 0; i < input_text_items.length; i++) {
@@ -39,22 +87,6 @@ function translateSearchInput(search_keywords) {
         }
         return query_syntax;
     }
-    let sql_default_order_by = "order by case type \
- when 'd' then 1\
- when 'h' then 2\
- when 'i' then 3\
- when 'p' then 4\
- when 't' then 5\
- when 'b' then 6\
- when 'c' then 7\
- when 'm' then 8\
- when 'l' then 9\
- when 's' then 10\
- when 'html' then 11\
- when 'widget' then 12\
- when 'query_embed' then 13\
- when 'iframe' then 14\
- end, updated desc";
     // 判断是否扩展范围搜索，若是则直接返回扩展范围搜索的sql语句
     if (options.match(/e/) != null) {
         let sql_extended_search = "select path from blocks where type ='d' ";
@@ -90,60 +122,51 @@ function translateSearchInput(search_keywords) {
     } else {
         return "-w"
     }
-    // 搜索类型
+    // sql 是否在当前文档搜索
     let sql_current_doc = "";
     if (options.match(/[kK]/) != null) {  // 当前文档或带子文档搜索
         let current_doc_id = document.querySelector(".fn__flex-1.protyle:not(.fn__none)").childNodes[1].childNodes[0].childNodes[0].getAttribute("data-node-id");
-        if (options.match(/K/) != null) { // 在当前文档及子文档搜索
-            sql_current_doc = "and path rlike '" + current_doc_id + "' ";
-        } else {                          // 在当前文档搜索
-            sql_current_doc = "and path like '%" + current_doc_id + ".sy' ";
-        }
+        sql_current_doc = options.match(/k/) ? `and path like '%${current_doc_id}.sy' ` // 在当前文档搜索
+                                             : `and path rlike '${current_doc_id}' `;   // 在当前文档及子文档搜索
         options = options.replace(/[kK]/g, "");
     } 
-    let sql_types          = options;
-    let sql_standard_types = sql_types.replace(/[oOL1-6]/g, "");      // 思源标准块类型
-    let sql_special_types  = sql_types.replace(/[dhlptbsicm]/g, "");  // 特殊类型
-    let sql_type_rlike     = "";                                      // sql筛选块的语句
-    if (sql_standard_types != "") {                  // 标准类型的sql语句
-        sql_type_rlike += "type rlike '^[" + sql_standard_types + "]$' ";
-    }
-    if (sql_special_types.match(/[1-6]/g) != null) { // 搜索子标题的sql语句
-        if (sql_type_rlike != "") sql_type_rlike += "or ";
-        sql_type_rlike += "subtype rlike '^h[" + sql_special_types.replace(/[^\d]/g, "") + "]$' ";
-    }
-    if (sql_special_types.match(/[oO]/g) != null) {  // 搜索待办的sql语句
-        if (sql_type_rlike != "") sql_type_rlike += "or ";
-        let todo_type = "";
-        if (sql_special_types.match(/o/g) != null && sql_special_types.match(/O/g) == null) {
-            todo_type = "and markdown like '%[ ] %'"
-        } else if (sql_special_types.match(/O/g) != null && sql_special_types.match(/o/g) == null) {
-            todo_type = "and markdown like '%[x] %'"
+    // sql 筛选搜索块类型
+    let sql_types      = options;
+    let sql_type_rlike = ""; // sql筛选块的语句
+    const type_handler = {
+        // 搜索标准块类型的sql语句
+        "dhlptbsicm": (types) => `type rlike '^[${types.replace(/[^dhlptbsicm]/g, "")}]$' `,
+        // 搜索子标题的sql语句
+        "1-6": (types) => `subtype rlike '^h[${types.replace(/[^\d]/g, "")}]$' `,
+        // 搜索待办的sql语句
+        "oO": (types) => {
+            let todoType = !types.includes('O') ? "and markdown like '%[ ] %'" // o：仅搜索未完成待办
+                         : !types.includes('o') ? "and markdown like '%[x] %'" // O：仅搜索已完成待办
+                         : "and (markdown like '%[ ] %' or markdown like '%[x] %')"; // oO：搜索所有待办
+            return `(subtype like 't' and type not like 'l' ${todoType}) `;
+        },
+        // 搜索带链接的块的sql语句
+        "L": () => `(type rlike '^[htp]$' and markdown like '%[%](%)%') `
+    };
+    for (let key in type_handler) {
+        const regex = new RegExp(`[${key}]`, 'g');
+        if (sql_types.match(regex)) {
+            if (sql_type_rlike != "") sql_type_rlike += "or ";
+            sql_type_rlike += type_handler[key](sql_types);
         }
-        sql_type_rlike += "(subtype like 't' and type not like 'l' " + todo_type + ") ";
     }
-    if(sql_special_types.match(/L/g) != null){       // 搜索带链接的块的sql语句
-        if (sql_type_rlike != "") sql_type_rlike += "or ";
-        sql_type_rlike += "(type rlike '^[htp]$' and markdown like '%[%](%)%') ";
+    if (sql_type_rlike == "") { // 未指定搜索块类型时，选择“搜索类型”中开启的块类型
+        let types = "";
+        let search_types = window.siyuan.storage['local-searchdata'].types;
+        for (const key in search_types) {
+            if (search_types[key]) types += type_mapping[key];
+        }
+        sql_type_rlike = `type rlike '^[${types}]$' `;
     }
-    if (sql_type_rlike != "") {
-        sql_type_rlike = "and (" + sql_type_rlike + ") ";
-    }
+    sql_type_rlike = "and (" + sql_type_rlike + ") ";
     sql_types = sql_types.replace(/[oOL1-6]/g, "");
-    // 排序
+    // sql 排序
     let sql_order_by = "order by case type";
-    const type_order = {
-        "d": " when 'd' then ",
-        "h": " when 'h' then ",
-        "i": " when 'i' then ",
-        "p": " when 'p' then ",
-        "t": " when 't' then ",
-        "b": " when 'b' then ",
-        "c": " when 'c' then ",
-        "m": " when 'm' then ",
-        "l": " when 'l' then ",
-        "s": " when 's' then ",
-    }
     if (sql_types != "") {
         for (let i = 0; i < sql_types.length; i++) {
             sql_order_by += type_order[sql_types[i]] + i.toString();
