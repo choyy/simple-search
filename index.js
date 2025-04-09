@@ -376,7 +376,8 @@ class SimpleSearch extends siyuan.Plugin {
         g_observer.observe(tab_search_node, observer_conf);
 
         // 在思源启动时，判断是否已经打开搜索页签，如果已经打开，则直接执行操作
-        if (document.querySelector('#layouts #searchInput')) {
+        if (document.querySelector('#layouts #searchInput')
+            && !document.querySelector('#layouts #simpleSearchInput')) {
             operationsAfterOpenSearch();
         }
 
@@ -388,6 +389,10 @@ class SimpleSearch extends siyuan.Plugin {
         g_observer.disconnect();
         this.eventBus.off("input-search", this.inputSearchEvent);
         this.eventBus.off("loaded-protyle-static", this.loadedProtyleStaticEvent);
+        const simpleSearchInput = document.querySelector('#layouts #simpleSearchInput');
+        if (simpleSearchInput) {
+            simpleSearchInput.remove(); // 删除搜索框
+        }
         console.log("simple search stop...")
     }
 };
