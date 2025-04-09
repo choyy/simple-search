@@ -2,7 +2,7 @@
   "name": "Simple Search",
   "author": "chooyy",
   "url": "https://github.com/choyy/simple-search",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "minAppVersion": "2.11.4",
   "backends": ["all"],
   "frontends": ["desktop", "desktop-window", "browser-desktop"],
