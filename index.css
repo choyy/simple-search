@@ -1,21 +1,27 @@
 #searchSyntaxCheck {
-	display: none
+    display: none
 }
-#tooltip~div[data-key="dialog-globalsearch"] #simpleSearchInput {
+
+body>script+div[data-key="dialog-globalsearch"] #simpleSearchInput {
     margin-right: -20%;
     padding-left: 6.6% !important;
 }
+
 #layouts #simpleSearchInput {
     margin-right: -90% !important;
 }
-#searchInput {
+
+body>script+div[data-key="dialog-globalsearch"] #searchInput,
+#layouts #searchInput {
     width: 0px;
     visibility: hidden;
 }
+
 ::highlight(highlight-keywords-search-list) {
     background-color: var(--b3-protyle-inline-mark-background);
     color: var(--b3-protyle-inline-mark-color);
 }
+
 ::highlight(highlight-keywords-search-preview) {
     background-color: var(--b3-theme-primary-lighter);
     box-shadow: 0 0 0 0.5px var(--b3-theme-on-background);
