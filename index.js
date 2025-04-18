@@ -134,22 +134,25 @@ function translateSearchInput(search_keywords) {
     let sql_types      = options;
     let sql_type_rlike = ""; // sql筛选块的语句
     const type_handler = {
-        // 搜索标准块类型的sql语句
-        "dhlptbsicm": (types) => `type rlike '^[${types.replace(/[^dhlptbsicm]/g, "")}]$' `,
-        // 搜索子标题的sql语句
-        "1-6": (types) => `subtype rlike '^h[${types.replace(/[^\d]/g, "")}]$' `,
+        // 搜索标准块类型的sql语句，标题单独处理
+        "[dlptbsicm]": (types) => `type rlike '^[${types.replace(/[^dlptbsicm]/g, "")}]$' `,
+        // 搜索标题和子标题的sql语句
+        "h[1-6]?": (types) => {
+            return types.match(/h[1-6]/) ? `subtype rlike '^h[${types.replace(/[^\d]/g, "")}]$' `
+                                         : `type rlike '^h$' `
+        },
         // 搜索待办的sql语句
-        "oO": (types) => {
+        "[oO]": (types) => {
             let todoType = !types.includes('O') ? "and markdown like '%[ ] %'" // o：仅搜索未完成待办
                          : !types.includes('o') ? "and markdown like '%[x] %'" // O：仅搜索已完成待办
                          : "and (markdown like '%[ ] %' or markdown like '%[x] %')"; // oO：搜索所有待办
             return `(subtype like 't' and type not like 'l' ${todoType}) `;
         },
         // 搜索带链接的块的sql语句
-        "L": () => `(type rlike '^[htp]$' and markdown like '%[%](%)%') `
+        "[L]": () => `(type rlike '^[htp]$' and markdown like '%[%](%)%') `
     };
     for (let key in type_handler) {
-        const regex = new RegExp(`[${key}]`, 'g');
+        const regex = new RegExp(`${key}`, 'g');
         if (sql_types.match(regex)) {
             if (sql_type_rlike != "") sql_type_rlike += "or ";
             sql_type_rlike += type_handler[key](sql_types);
