@@ -186,7 +186,7 @@ let g_last_search_method = -1;
 function switchSearchMethod(i) {
     if (g_last_search_method != i) {
         // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-        const searchSyntaxCheck = document.querySelector('body>script+div[data-key="dialog-globalsearch"] #searchSyntaxCheck')
+        const searchSyntaxCheck = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchSyntaxCheck')
                                || document.querySelector('#layouts #searchSyntaxCheck');
         searchSyntaxCheck.click();
         document.querySelector("#commonMenu").lastChild.children[i].click();
@@ -197,7 +197,7 @@ function switchSearchMethod(i) {
 let g_changed_user_groupby = false;      // 记录是否切换过分组
 function changeGroupBy(i){               // i = 0 默认分组，i = 1 按文档分组
     // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-    const searchMore = document.querySelector('body>script+div[data-key="dialog-globalsearch"] #searchMore')
+    const searchMore = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchMore')
                     || document.querySelector('#layouts #searchMore');
     if (i == 0 && g_changed_user_groupby && window.siyuan.storage['local-searchdata'].group == 0) {         // 若分组被切换过，且默认不分组，则切换不分组
         searchMore.click();
@@ -240,9 +240,9 @@ let g_highlight_keywords = false;
 class SimpleSearch extends siyuan.Plugin {
     inputSearchEvent() { // 保存关键词，确保思源搜索关键词为输入的关键词，而不是翻译后的sql语句
         // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-        const searchInput = document.querySelector('body>script+div[data-key="dialog-globalsearch"] #searchInput')
+        const searchInput = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchInput')
                          || document.querySelector('#layouts #searchInput')
-        const simpleSearchInput = document.querySelector('body>script+div[data-key="dialog-globalsearch"] #simpleSearchInput')
+        const simpleSearchInput = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #simpleSearchInput')
                                || document.querySelector('#layouts #simpleSearchInput')
         if (/^#.*#$/.test(searchInput.value)  // 多次点击标签搜索时更新搜索框关键词
             && searchInput.value != simpleSearchInput.value) {
@@ -257,14 +257,14 @@ class SimpleSearch extends siyuan.Plugin {
         CSS.highlights.clear();     // 清除上个高亮
         if (g_highlight_keywords) { // 判断是否需要高亮关键词
             // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-            const search_list = document.querySelector('body>script+div[data-key="dialog-globalsearch"] #searchList')
+            const search_list = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchList')
                              || document.querySelector('#layouts #searchList'); // 搜索结果列表的节点
             if (search_list == null) return; // 判断是否存在搜索界面
             const search_list_text_nodes = Array.from(search_list.querySelectorAll(".b3-list-item__text"), el => el.firstChild); // 获取所有具有 b3-list-item__text 类的节点的文本子节点
             g_keywords.forEach((keyword) => {
                 highlightKeywords(search_list_text_nodes, keyword, "highlight-keywords-search-list");
             });
-            const search_preview = document.querySelector('body>script+div[data-key="dialog-globalsearch"] #searchPreview')
+            const search_preview = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchPreview')
                                 || document.querySelector('#layouts #searchPreview'); // 搜索预览内容的节点
             const tree_walker = document.createTreeWalker(search_preview.children[1].children[0], NodeFilter.SHOW_TEXT);     // 创建 createTreeWalker 迭代器，用于遍历文本节点，保存到一个数组
             const search_preview_text_nodes = [];
@@ -293,7 +293,7 @@ class SimpleSearch extends siyuan.Plugin {
             g_last_search_method = -1; // 每次打开搜索都要设置搜索方法
             // 插入新搜索框，隐藏原搜索框
             let originalSearchInput = // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-                document.querySelector('body>script+div[data-key="dialog-globalsearch"] #searchInput')
+                document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchInput')
                 || document.querySelector('#layouts #searchInput');
             let simpleSearchInput = originalSearchInput.cloneNode();
             simpleSearchInput.id = "simpleSearchInput";
@@ -358,7 +358,7 @@ class SimpleSearch extends siyuan.Plugin {
                 if (mutationsList[i].addedNodes.length == 0) return;
                 if (mutationsList[i].addedNodes[0].getAttribute('data-key') == "dialog-globalsearch") {// 判断全局搜索
                     operationsAfterOpenSearch(); 
-                    document.querySelector(`body>script+div[data-key="dialog-globalsearch"] #searchOpen`).onclick = function () { // 确保按下在页签打开时搜索关键词不变
+                    document.querySelector(`body>script~div[data-key="dialog-globalsearch"] #searchOpen`).onclick = function () { // 确保按下在页签打开时搜索关键词不变
                         document.querySelector('#layouts #searchInput').value = g_search_keywords;
                     }.bind(this);
                     return;

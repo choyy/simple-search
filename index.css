@@ -2,7 +2,7 @@
     display: none
 }
 
-body>script+div[data-key="dialog-globalsearch"] #simpleSearchInput {
+body>script~div[data-key="dialog-globalsearch"] #simpleSearchInput {
     margin-right: -20%;
     padding-left: 6.6% !important;
 }
@@ -11,7 +11,7 @@ body>script+div[data-key="dialog-globalsearch"] #simpleSearchInput {
     margin-right: -90% !important;
 }
 
-body>script+div[data-key="dialog-globalsearch"] #searchInput,
+body>script~div[data-key="dialog-globalsearch"] #searchInput,
 #layouts #searchInput {
     width: 0px;
     visibility: hidden;
