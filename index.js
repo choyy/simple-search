@@ -188,26 +188,30 @@ function translateSearchInput(search_keywords) {
     return "-s" + sql_prefix + sql_key_words + sql_type_rlike + sql_current_doc + sql_order_by;
 }
 
-function highlightKeywords(search_list_text_nodes, keyword, highlight_type) {
-    const str = keyword.trim().toLowerCase();
-    const ranges = search_list_text_nodes // 查找所有文本节点是否包含搜索词
-        .map((el) => {
-            const text = el.textContent.toLowerCase();
-            const indices = [];
-            let startPos = 0;
-            while (startPos < text.length) {
-                const index = text.indexOf(str, startPos);
-                if (index === -1) break;
-                indices.push(index);
-                startPos = index + str.length;
-            }
-            return indices.map((index) => {
-                const range = document.createRange();
-                range.setStart(el, index);
-                range.setEnd(el, index + str.length);
-                return range;
+function highlightKeywords(search_list_text_nodes, keywords, highlight_type) {
+    const ranges = [];
+    keywords.forEach((keyword) => {
+        const str = keyword.trim().toLowerCase();
+        const range = search_list_text_nodes // 查找所有文本节点是否包含搜索词
+            .map((el) => {
+                const text = el.textContent.toLowerCase();
+                const indices = [];
+                let startPos = 0;
+                while (startPos < text.length) {
+                    const index = text.indexOf(str, startPos);
+                    if (index === -1) break;
+                    indices.push(index);
+                    startPos = index + str.length;
+                }
+                return indices.map((index) => {
+                    const range = document.createRange();
+                    range.setStart(el, index);
+                    range.setEnd(el, index + str.length);
+                    return range;
+                });
             });
-        });
+        ranges.push(...range.flat());
+    });
     const searchResultsHighlight = new Highlight(...ranges.flat()); // 创建高亮对象
     CSS.highlights.set(highlight_type, searchResultsHighlight);     // 注册高亮
 }
@@ -220,7 +224,7 @@ class SimpleSearch extends siyuan.Plugin {
         // 设置搜索参数
         data.detail.config.method = search_method_mapping[search_keywords_translated.slice(0, 2)];
         data.detail.config.query = search_keywords_translated.slice(2);
-        window.siyuan.storage["local-searchdata"].k = search_keywords; // 保存搜索关键词，打开搜索面板时默认填充
+        window.siyuan.storage["local-searchdata"].k = search_keywords; // 保存搜索关键词，下次打开索面板时默认填充
         
         if (search_keywords_translated.slice(0, 2) == "-s") {
             g_highlight_keywords = true;
@@ -237,24 +241,22 @@ class SimpleSearch extends siyuan.Plugin {
                              || document.querySelector('#layouts #searchList'); // 搜索结果列表的节点
             if (search_list == null) return; // 判断是否存在搜索界面
             const search_list_text_nodes = Array.from(search_list.querySelectorAll(".b3-list-item__text"), el => el.firstChild); // 获取所有具有 b3-list-item__text 类的节点的文本子节点
-            g_keywords.forEach((keyword) => {
-                highlightKeywords(search_list_text_nodes, keyword, "highlight-keywords-search-list");
-            });
+            highlightKeywords(search_list_text_nodes, g_keywords, "highlight-keywords-search-list");
             const search_preview = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchPreview')
                                 || document.querySelector('#layouts #searchPreview'); // 搜索预览内容的节点
-            const tree_walker = document.createTreeWalker(search_preview.children[1].children[0], NodeFilter.SHOW_TEXT);     // 创建 createTreeWalker 迭代器，用于遍历文本节点，保存到一个数组
+            const tree_walker = document.createTreeWalker(search_preview.children[1].children[0], NodeFilter.SHOW_TEXT); // 创建 createTreeWalker 迭代器，用于遍历文本节点，保存到一个数组
             const search_preview_text_nodes = [];
             let current_node = tree_walker.nextNode();
             while (current_node) {
-                if (current_node.textContent.trim().length > 1) {
+                if (current_node.textContent.trim().length > 0) {
                     search_preview_text_nodes.push(current_node);
                 }
                 current_node = tree_walker.nextNode();
             }
-            g_keywords.forEach((keyword) => {
-                highlightKeywords(search_preview_text_nodes, keyword, "highlight-keywords-search-preview");
-            });
+            highlightKeywords(search_preview_text_nodes, g_keywords, "highlight-keywords-search-preview");
         }
+        // 当使用按文档分组时，搜索列表认不再顶部，需要调整到顶部
+        document.querySelector("#searchList").scrollTo({ top: 0, behavior: 'smooth' });
     }
     onLayoutReady() {
         this.eventBus.on("input-search", this.inputSearchEvent);
