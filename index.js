@@ -47,12 +47,17 @@ const type_mapping = { // 定义思源块类型映射关系
     videoBlock: '',
     widgetBlock: ''
 };
+const search_method_mapping = {
+    "-w": 0, // 关键字搜索
+    "-q": 1, // 查询语法搜索
+    "-s": 2, // SQL搜索
+    "-r": 3  // 正则表达式搜索
+};
 
 let g_keywords = [];
 function translateSearchInput(search_keywords) {
-    if (search_keywords.length < 2 || search_keywords.match("^-[wqrs]") != null) {
-        return search_keywords;
-    }
+    if (search_keywords.length < 2) { return "-w" + search_keywords; }
+    if (search_keywords.match("^-[wqrs]") != null) { return search_keywords; }
     let input_text_items            = search_keywords.split(" ");
     let key_words                   = []; // 搜索关键词
     let excluded_key_words          = []; // 排除的关键词
@@ -63,11 +68,11 @@ function translateSearchInput(search_keywords) {
         if (input_text_items[i] == "" || input_text_items[i] == "-") {
             continue;
         } else if (input_text_items[i].match(/^-[kKedhlptbsicmoOL1-6]+$/) != null) { // kK为当前文档搜索，e为扩展搜索，其他为块类型
-            options += input_text_items[i].substring(1, input_text_items[i].length);
+            options += input_text_items[i].slice(1);
             if_options_exist = true;
         }
         else if (input_text_items[i].match(/^-.+/) != null) {
-            excluded_key_words.push(input_text_items[i].substring(1, input_text_items[i].length));
+            excluded_key_words.push(input_text_items[i].slice(1));
             if_excluded_key_words_exist = true;
         }
         else {
@@ -182,33 +187,6 @@ function translateSearchInput(search_keywords) {
     // 完整sql语句
     return "-s" + sql_prefix + sql_key_words + sql_type_rlike + sql_current_doc + sql_order_by;
 }
-let g_last_search_method = -1;
-function switchSearchMethod(i) {
-    if (g_last_search_method != i) {
-        // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-        const searchSyntaxCheck = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchSyntaxCheck')
-                               || document.querySelector('#layouts #searchSyntaxCheck');
-        searchSyntaxCheck.click();
-        document.querySelector("#commonMenu").lastChild.children[i].click();
-        g_last_search_method = i;
-    }
-}
-
-let g_changed_user_groupby = false;      // 记录是否切换过分组
-function changeGroupBy(i){               // i = 0 默认分组，i = 1 按文档分组
-    // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-    const searchMore = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchMore')
-                    || document.querySelector('#layouts #searchMore');
-    if (i == 0 && g_changed_user_groupby && window.siyuan.storage['local-searchdata'].group == 0) {         // 若分组被切换过，且默认不分组，则切换不分组
-        searchMore.click();
-        document.querySelector("#commonMenu").lastChild.children[1].children[2].firstChild.firstChild.click();
-        g_changed_user_groupby = false;
-    } else if (i == 1 && !g_changed_user_groupby && window.siyuan.storage['local-searchdata'].group == 0) { // 若分组没切换过，且默认不分组，则按文档分组
-        searchMore.click();
-        document.querySelector("#commonMenu").lastChild.children[1].children[2].firstChild.lastChild.click();
-        g_changed_user_groupby = true;
-    }
-}
 
 function highlightKeywords(search_list_text_nodes, keyword, highlight_type) {
     const str = keyword.trim().toLowerCase();
@@ -234,24 +212,22 @@ function highlightKeywords(search_list_text_nodes, keyword, highlight_type) {
     CSS.highlights.set(highlight_type, searchResultsHighlight);     // 注册高亮
 }
 
-let g_observer;
-let g_search_keywords = "";
 let g_highlight_keywords = false;
 class SimpleSearch extends siyuan.Plugin {
-    inputSearchEvent() { // 保存关键词，确保思源搜索关键词为输入的关键词，而不是翻译后的sql语句
-        // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-        const searchInput = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchInput')
-                         || document.querySelector('#layouts #searchInput')
-        const simpleSearchInput = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #simpleSearchInput')
-                               || document.querySelector('#layouts #simpleSearchInput')
-        if (/^#.*#$/.test(searchInput.value)  // 多次点击标签搜索时更新搜索框关键词
-            && searchInput.value != simpleSearchInput.value) {
-            simpleSearchInput.value = searchInput.value;
-            simpleSearchInput.focus();  // 聚焦到输入框
-            simpleSearchInput.select(); // 选择框内内容
-            g_search_keywords = searchInput.value;
+    inputSearchEvent(data) {
+        let search_keywords = data.detail.config.query;
+        let search_keywords_translated = translateSearchInput(search_keywords);
+        // 设置搜索参数
+        data.detail.config.method = search_method_mapping[search_keywords_translated.slice(0, 2)];
+        data.detail.config.query = search_keywords_translated.slice(2);
+        window.siyuan.storage["local-searchdata"].k = search_keywords; // 保存搜索关键词，打开搜索面板时默认填充
+        
+        if (search_keywords_translated.slice(0, 2) == "-s") {
+            g_highlight_keywords = true;
+            if (search_keywords_translated.match(/'\^\[libs\]\$'/g) != null) { // 若是扩展搜索，按文档分组
+                data.detail.config.group = 1;
+            }
         }
-        window.siyuan.storage["local-searchdata"].k = g_search_keywords;
     }
     loadedProtyleStaticEvent() {    // 在界面加载完毕后高亮关键词
         CSS.highlights.clear();     // 清除上个高亮
@@ -281,121 +257,14 @@ class SimpleSearch extends siyuan.Plugin {
         }
     }
     onLayoutReady() {
-        // 选择需要观察变动的节点
-        const global_search_node = document.querySelector("body");
-        const tab_search_node = document.querySelector(".layout__center");
-        // 监视子节点的增减
-        const observer_conf = { childList: true };
-        // 当观察到变动时执行的回调函数
-        // 即当搜索界面打开时，插入新搜索框，隐藏原搜索框，然后将新搜索框内容转成sql后填入原搜索框
-        const input_event = new InputEvent("input");
-        const operationsAfterOpenSearch = function () {
-            g_last_search_method = -1; // 每次打开搜索都要设置搜索方法
-            // 插入新搜索框，隐藏原搜索框
-            let originalSearchInput = // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-                document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchInput')
-                || document.querySelector('#layouts #searchInput');
-            let simpleSearchInput = originalSearchInput.cloneNode();
-            simpleSearchInput.id = "simpleSearchInput";
-            simpleSearchInput.value = "";
-            originalSearchInput.before(simpleSearchInput);
-            simpleSearchInput.nextSibling.onclick = function () { // 设置清空按钮
-                simpleSearchInput.value = "";
-                simpleSearchInput.focus();
-            }
-            const input_event_func = function () {
-                g_highlight_keywords = false;
-                g_search_keywords = simpleSearchInput.value;
-                if (g_search_keywords.length < 2) {
-                    switchSearchMethod(0);
-                    originalSearchInput.value = g_search_keywords;
-                } else {
-                    let input_translated = translateSearchInput(g_search_keywords);
-                    switch (input_translated.substring(0, 2)) {
-                        case "-w": switchSearchMethod(0); break;
-                        case "-q": switchSearchMethod(1); break;
-                        case "-s": switchSearchMethod(2); break;
-                        case "-r": switchSearchMethod(3); break;
-                    }
-                    originalSearchInput.value = input_translated.slice(2, input_translated.length);
-                    if (input_translated.substring(0, 2) == "-s") {
-                        g_highlight_keywords = true;
-                        if (input_translated.match(/'\^\[libs\]\$'/g) != null) { // 若是扩展搜索，按文档分组
-                            changeGroupBy(1);
-                        } else { // 否则切换默认分组
-                            changeGroupBy(0);
-                        }
-                    }
-                }
-                originalSearchInput.dispatchEvent(input_event);
-            }
-            const keyboard_event_func = function (event) {
-                switch (event.keyCode) {
-                    case 13:
-                        originalSearchInput.dispatchEvent(new KeyboardEvent("keydown", { "keyCode": 13, "code": "KeyEnter", "key": "Enter" }));
-                        break;
-                    case 38:
-                        originalSearchInput.dispatchEvent(new KeyboardEvent("keydown", { "keyCode": 38, "code": "KeyArrowUp", "key": "ArrowUp" }));
-                        return false; // 禁用方向键原跳到行首功能
-                    case 40:
-                        originalSearchInput.dispatchEvent(new KeyboardEvent("keydown", { "keyCode": 40, "code": "KeyArrowDown", "key": "ArrowDown" }));
-                        return false; // 禁用方向键原跳到行尾功能
-                }
-            }
-
-            simpleSearchInput.value = originalSearchInput.value; // 1、原搜索框关键词为保存的g_search_keywords  2、确保点击标签搜索时不被影响
-            input_event_func();
-            simpleSearchInput.focus();  // 聚焦到输入框
-            simpleSearchInput.select(); // 选择框内内容
-
-            // 当在输入框中按下按键的时候，将搜索框内容转成sql后填入原搜索框
-            g_search_keywords = simpleSearchInput.value;
-            simpleSearchInput.oninput = input_event_func; // 监听input事件
-            simpleSearchInput.onkeydown = keyboard_event_func; // enter键打开搜索结果，上下键选择
-        }.bind(this);
-        const openSearchCallback = function (mutationsList) {
-            for (let i = 0; i < mutationsList.length; i++) {
-                if (mutationsList[i].addedNodes.length == 0) return;
-                if (mutationsList[i].addedNodes[0].getAttribute('data-key') == "dialog-globalsearch") {// 判断全局搜索
-                    operationsAfterOpenSearch(); 
-                    document.querySelector(`body>script~div[data-key="dialog-globalsearch"] #searchOpen`).onclick = function () { // 确保按下在页签打开时搜索关键词不变
-                        document.querySelector('#layouts #searchInput').value = g_search_keywords;
-                    }.bind(this);
-                    return;
-                } else if (mutationsList[i].addedNodes[0].className == "fn__flex-1 fn__flex"  // 判断搜索页签
-                    && mutationsList[i].addedNodes[0].innerText == "搜索") {
-                    operationsAfterOpenSearch(); return;
-                } 
-            }
-        }.bind(this);
-
         this.eventBus.on("input-search", this.inputSearchEvent);
         this.eventBus.on("loaded-protyle-static", this.loadedProtyleStaticEvent);
-
-        // 创建一个观察器实例并传入回调函数
-        g_observer = new MutationObserver(openSearchCallback);
-        // 开始观察目标节点
-        g_observer.observe(global_search_node, observer_conf);
-        g_observer.observe(tab_search_node, observer_conf);
-
-        // 在思源启动时，判断是否已经打开搜索页签，如果已经打开，则直接执行操作
-        if (document.querySelector('#layouts #searchInput')
-            && !document.querySelector('#layouts #simpleSearchInput')) {
-            operationsAfterOpenSearch();
-        }
-
         console.log("simple search start...")
     }
 
     onunload() {
-        // 停止观察目标节点
-        g_observer.disconnect();
         this.eventBus.off("input-search", this.inputSearchEvent);
         this.eventBus.off("loaded-protyle-static", this.loadedProtyleStaticEvent);
-        const simpleSearchInput = document.querySelector('#layouts #simpleSearchInput');
-        if (simpleSearchInput) {
-            simpleSearchInput.remove(); // 删除搜索框
-        }
         console.log("simple search stop...")
     }
 };
