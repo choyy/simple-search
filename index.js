@@ -16,18 +16,6 @@ const sql_default_order_by = "order by case type \
  when 'query_embed' then 13\
  when 'iframe' then 14\
  end, updated desc";
-const type_order = {
-    "d": " when 'd' then ",
-    "h": " when 'h' then ",
-    "i": " when 'i' then ",
-    "p": " when 'p' then ",
-    "t": " when 't' then ",
-    "b": " when 'b' then ",
-    "c": " when 'c' then ",
-    "m": " when 'm' then ",
-    "l": " when 'l' then ",
-    "s": " when 's' then ",
-}
 const type_mapping = { // 定义思源块类型映射关系
     audioBlock: '',
     blockquote: 'b',
@@ -55,30 +43,102 @@ const search_method_mapping = {
 };
 
 let g_keywords = [];
-function translateSearchInput(search_keywords) {
-    if (search_keywords.length < 2) { return "-w" + search_keywords; }
-    if (search_keywords.match("^-[wqrs]") != null) { return search_keywords; }
-    let input_text_items            = search_keywords.split(" ");
-    let key_words                   = []; // 搜索关键词
-    let excluded_key_words          = []; // 排除的关键词
-    let options                     = ""; // 搜索选项
-    let if_options_exist            = false;
-    let if_excluded_key_words_exist = false;
+function parseInputItems(search_keywords) {
+    let input_text_items   = search_keywords.split(" ");
+    let key_words          = []; // 搜索关键词
+    let excluded_key_words = []; // 排除的关键词
+    let options            = ""; // 搜索选项
+    
     for (let i = 0; i < input_text_items.length; i++) {
         if (input_text_items[i] == "" || input_text_items[i] == "-") {
             continue;
-        } else if (input_text_items[i].match(/^-[kKedhlptbsicmoOL1-6]+$/) != null) { // kK为当前文档搜索，e为扩展搜索，其他为块类型
+        } else if (input_text_items[i].match(/^-[kKDedhlptbsicmoOL1-6]+$/) != null) {
             options += input_text_items[i].slice(1);
-            if_options_exist = true;
         }
         else if (input_text_items[i].match(/^-.+/) != null) {
             excluded_key_words.push(input_text_items[i].slice(1));
-            if_excluded_key_words_exist = true;
         }
         else {
             key_words.push(input_text_items[i]);
         }
     }
+    
+    return {
+        key_words: key_words,
+        excluded_key_words: excluded_key_words,
+        options: options
+    };
+}
+function transferSqlKeyWords(key_words, excluded_key_words, field = "content") {
+    let conditions = [];
+    for (let keyword of key_words) {
+        conditions.push(`${field} like '%${keyword}%'`);
+    }
+    for (let keyword of excluded_key_words) {
+        conditions.push(`${field} not like '%${keyword}%'`);
+    }
+    return conditions.length > 0 ? `(${conditions.join(' and ')}) ` : "true ";
+}
+function transferSqlTypes(options) {
+    let sql_type_rlike = ""; // sql筛选块的语句
+    const type_handler = {   // 这里使用REGEXP而不是rlike，因为递归查bu 不支持rlike
+        // 搜索标准块类型的sql语句，标题单独处理
+        "[dlptbsicm]": (types) => `type REGEXP '^[${types.replace(/[^dlptbsicm]/g, "")}]$' `,
+        // 搜索标题和子标题的sql语句
+        "h[1-6]?": (types) => {
+            return types.match(/h[1-6]/) ? `subtype REGEXP '^h[${types.replace(/[^\d]/g, "")}]$' `
+                                         : `type REGEXP '^h$' `
+        },
+        // 搜索待办的sql语句
+        "[oO]": (types) => {
+            let todoType = !types.includes('O') ? "and markdown like '%[ ] %'" // o：仅搜索未完成待办
+                         : !types.includes('o') ? "and markdown like '%[x] %'" // O：仅搜索已完成待办
+                         : "and (markdown like '%[ ] %' or markdown like '%[x] %')"; // oO：搜索所有待办
+            return `(subtype like 't' and type not like 'l' ${todoType}) `;
+        },
+        // 搜索带链接的块的sql语句
+        "[L]": () => `(type REGEXP '^[htp]$' and markdown like '%[%](%)%') `
+    };
+    for (let key in type_handler) {
+        const regex = new RegExp(`${key}`, 'g');
+        if (options.match(regex)) {
+            if (sql_type_rlike != "") sql_type_rlike += "or ";
+            sql_type_rlike += type_handler[key](options);
+        }
+    }
+    if (sql_type_rlike == "") { // 未指定搜索块类型时，选择“搜索类型”中开启的块类型
+        let types = "";
+        let search_types = window.siyuan.storage['local-searchdata'].types;
+        for (const key in search_types) {
+            if (search_types[key]) types += type_mapping[key];
+        }
+        sql_type_rlike = `type REGEXP '^[${types}]$' `;
+    }
+    sql_type_rlike = "and (" + sql_type_rlike + ") ";
+    return sql_type_rlike;
+}
+function transferSqlOrderby(options) {
+    let sql_order_by = "order by case type";
+    if (options != "") {
+        for (let i = 0; i < options.length; i++) {
+            sql_order_by += " when '" + options[i] + "' then " + i.toString();
+        }
+        sql_order_by += " end, updated desc";
+    } else {
+        sql_order_by = sql_default_order_by;
+    }
+    return sql_order_by;
+}
+function translateSearchInput(search_keywords) {
+    if (search_keywords.length < 2) { return "-w" + search_keywords; }
+    if (search_keywords.match("^-[wqrs]") != null) { return search_keywords; }
+    if (search_keywords.match(/\|/) != null) { return translateSearchInputPipe(search_keywords); }
+    let input_text_items            = parseInputItems(search_keywords);
+    let key_words                   = input_text_items.key_words;          // 搜索关键词
+    let excluded_key_words          = input_text_items.excluded_key_words; // 排除的关键词
+    let options                     = input_text_items.options;            // 搜索选项
+    let if_options_exist            = (options != "");
+    let if_excluded_key_words_exist = (excluded_key_words.length != 0);
     g_keywords = key_words;
     if ((!if_options_exist) && (!if_excluded_key_words_exist)) {
         return "-w" + search_keywords; // 仅有关键词时使用关键词查询
@@ -112,21 +172,8 @@ function translateSearchInput(search_keywords) {
     // sql 首部分
     let sql_prefix = "select * from blocks where ";
     // sql 搜索关键词
-    let sql_key_words = "";
-    if (key_words.length != 0) {
-        sql_key_words += "content like '%" + key_words[0] + "%' ";
-        for (let i = 1; i < key_words.length; i++) {
-            sql_key_words += "and content like '%" + key_words[i] + "%' ";
-        }
-    }
-    for (let i = 0; i < excluded_key_words.length; i++) {
-        sql_key_words += "and content not like '%" + excluded_key_words[i] + "%' ";
-    }
-    if (sql_key_words != "") {
-        sql_key_words = "(" + sql_key_words + ") ";
-    } else {
-        return "-w"
-    }
+    let sql_key_words = transferSqlKeyWords(key_words, excluded_key_words);
+    if (sql_key_words == "") { return "-w" }
     // sql 是否在当前文档搜索
     let sql_current_doc = "";
     if (options.match(/[kK]/) != null) {  // 当前文档或带子文档搜索
@@ -136,56 +183,50 @@ function translateSearchInput(search_keywords) {
         options = options.replace(/[kK]/g, "");
     } 
     // sql 筛选搜索块类型
-    let sql_types      = options;
-    let sql_type_rlike = ""; // sql筛选块的语句
-    const type_handler = {
-        // 搜索标准块类型的sql语句，标题单独处理
-        "[dlptbsicm]": (types) => `type rlike '^[${types.replace(/[^dlptbsicm]/g, "")}]$' `,
-        // 搜索标题和子标题的sql语句
-        "h[1-6]?": (types) => {
-            return types.match(/h[1-6]/) ? `subtype rlike '^h[${types.replace(/[^\d]/g, "")}]$' `
-                                         : `type rlike '^h$' `
-        },
-        // 搜索待办的sql语句
-        "[oO]": (types) => {
-            let todoType = !types.includes('O') ? "and markdown like '%[ ] %'" // o：仅搜索未完成待办
-                         : !types.includes('o') ? "and markdown like '%[x] %'" // O：仅搜索已完成待办
-                         : "and (markdown like '%[ ] %' or markdown like '%[x] %')"; // oO：搜索所有待办
-            return `(subtype like 't' and type not like 'l' ${todoType}) `;
-        },
-        // 搜索带链接的块的sql语句
-        "[L]": () => `(type rlike '^[htp]$' and markdown like '%[%](%)%') `
-    };
-    for (let key in type_handler) {
-        const regex = new RegExp(`${key}`, 'g');
-        if (sql_types.match(regex)) {
-            if (sql_type_rlike != "") sql_type_rlike += "or ";
-            sql_type_rlike += type_handler[key](sql_types);
-        }
-    }
-    if (sql_type_rlike == "") { // 未指定搜索块类型时，选择“搜索类型”中开启的块类型
-        let types = "";
-        let search_types = window.siyuan.storage['local-searchdata'].types;
-        for (const key in search_types) {
-            if (search_types[key]) types += type_mapping[key];
-        }
-        sql_type_rlike = `type rlike '^[${types}]$' `;
-    }
-    sql_type_rlike = "and (" + sql_type_rlike + ") ";
-    sql_types = sql_types.replace(/[oOL1-6]/g, "");
+    let sql_type_rlike = transferSqlTypes(options);
+    options = options.replace(/[DoOL1-6]/g, "");
     // sql 排序
-    let sql_order_by = "order by case type";
-    if (sql_types != "") {
-        for (let i = 0; i < sql_types.length; i++) {
-            sql_order_by += type_order[sql_types[i]] + i.toString();
-        }
-        sql_order_by += " end, updated desc";
-    } else {
-        sql_order_by = sql_default_order_by;
-    }
+    let sql_order_by = transferSqlOrderby(options);
 
     // 完整sql语句
     return "-s" + sql_prefix + sql_key_words + sql_type_rlike + sql_current_doc + sql_order_by;
+}
+function translateSearchInputPipe(search_keywords) {
+    let input_text_items = search_keywords.split("|");
+    let { key_words, excluded_key_words, options } = parseInputItems(input_text_items[0]);
+    options = options.replace(/[^Ddh]/g, ""); // 初始查询条件仅查询文档、标题
+    let sql_key_words, sql_types;
+    if (options.match(/D/) == null) { // 仅在文档、标题下搜索
+        sql_key_words = transferSqlKeyWords(key_words, excluded_key_words);
+        sql_types = `and type GLOB '[${options == "" ? "dh" : options}]' `;
+    } else { // 在文档及子文档下搜索
+        sql_key_words = transferSqlKeyWords(key_words, excluded_key_words, "hpath");
+        sql_types = `and type = 'd'`;
+    }
+    let sql_condition1 = sql_key_words + sql_types; // 初始查询条件
+
+    ({ key_words, excluded_key_words, options } = parseInputItems(input_text_items[input_text_items.length - 1]));
+    sql_key_words      = transferSqlKeyWords(key_words, excluded_key_words, "b.content");
+    sql_types          = transferSqlTypes(options);
+    let sql_condition2 = sql_key_words + sql_types;
+    let sql_order_by   = transferSqlOrderby(options);
+
+    g_keywords = key_words;
+
+    let sql_recursive = `
+    WITH RECURSIVE ChildBlocks AS (
+        SELECT id, parent_id FROM blocks WHERE id IN (
+            SELECT id FROM blocks WHERE ${sql_condition1}
+        )
+        UNION ALL
+        SELECT b.id, b.parent_id FROM blocks b
+        INNER JOIN ChildBlocks cb ON b.parent_id = cb.id
+    )
+    SELECT DISTINCT b.* FROM blocks b
+    JOIN ChildBlocks cb ON b.id = cb.id
+    WHERE ${sql_condition2} ${sql_order_by}
+    `;
+    return "-s" + sql_recursive;
 }
 
 function highlightKeywords(search_list_text_nodes, keywords, highlight_type) {
