@@ -81,7 +81,7 @@ function transferSqlKeyWords(key_words, excluded_key_words, field = "content") {
 }
 function transferSqlTypes(options) {
     let sql_type_rlike = ""; // sql筛选块的语句
-    const type_handler = {   // 这里使用REGEXP而不是rlike，因为递归查bu 不支持rlike
+    const type_handler = {   // 这里使用REGEXP而不是rlike，因为递归查询不支持rlike
         // 搜索标准块类型的sql语句，标题单独处理
         "[dlptbsicm]": (types) => `type REGEXP '^[${types.replace(/[^dlptbsicm]/g, "")}]$' `,
         // 搜索标题和子标题的sql语句
