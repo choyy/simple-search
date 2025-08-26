@@ -42,7 +42,7 @@ const search_method_mapping = {
     "-r": 3  // 正则表达式搜索
 };
 
-let g_keywords = [], g_search_group = window.siyuan.storage["local-searchdata"].group; // 全局变量，保存搜索关键词和分组方式
+let g_keywords = [], g_search_group = 0; // 全局变量，保存搜索关键词和分组方式
 function parseInputItems(search_keywords) {
     let input_text_items   = search_keywords.split(" ");
     let key_words          = []; // 搜索关键词
@@ -278,8 +278,8 @@ class SimpleSearch extends siyuan.Plugin {
         }
     }
     loadedProtyleStaticEvent() {    // 在界面加载完毕后高亮关键词
-        CSS.highlights.clear();     // 清除上个高亮
         if (g_highlight_keywords) { // 判断是否需要高亮关键词
+            CSS.highlights.clear(); // 清除上个高亮
             // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
             const search_list = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchList')
                              || document.querySelector('#layouts #searchList'); // 搜索结果列表的节点
@@ -300,10 +300,12 @@ class SimpleSearch extends siyuan.Plugin {
             highlightKeywords(search_preview_text_nodes, g_keywords, "highlight-keywords-search-preview");
             g_highlight_keywords = false;
         }
-        // 当使用按文档分组时，搜索列表认不再顶部，需要调整到顶部
-        document.querySelector("#searchList").scrollTo({ top: 0, behavior: 'smooth' });
+        if (g_search_group == 1) { // 当使用按文档分组时，搜索列表认不在顶部，需要调整到顶部
+            const searchList = document.querySelector("#searchList");
+            if (searchList) { searchList.scrollTo({ top: 0, behavior: 'smooth' }); }
+        }
     }
-    onLayoutReady() {
+    onload() {
         this.eventBus.on("input-search", this.inputSearchEvent);
         this.eventBus.on("loaded-protyle-static", this.loadedProtyleStaticEvent);
         console.log("simple search start...")
