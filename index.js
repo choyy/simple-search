@@ -262,7 +262,7 @@ function highlightKeywords(search_list_text_nodes, keywords, highlight_type) {
     CSS.highlights.set(highlight_type, searchResultsHighlight);     // 注册高亮
 }
 
-let g_highlight_keywords = false;
+let g_highlight_keywords = false, g_scroll_top = false;
 class SimpleSearch extends siyuan.Plugin {
     inputSearchEvent(data) {
         let search_keywords            = data.detail.config.query;
@@ -275,6 +275,7 @@ class SimpleSearch extends siyuan.Plugin {
         if (search_keywords_translated.slice(0, 2) == "-s") {
             g_highlight_keywords     = true;
             data.detail.config.group = g_search_group; // 设置分组方式
+            g_scroll_top = true;
         }
     }
     loadedProtyleStaticEvent() {    // 在界面加载完毕后高亮关键词
@@ -300,9 +301,10 @@ class SimpleSearch extends siyuan.Plugin {
             highlightKeywords(search_preview_text_nodes, g_keywords, "highlight-keywords-search-preview");
             g_highlight_keywords = false;
         }
-        if (g_search_group == 1) { // 当使用按文档分组时，搜索列表认不在顶部，需要调整到顶部
+        if (g_search_group == 1 && g_scroll_top) { // 当使用按文档分组时，搜索列表认不在顶部，需要调整到顶部
             const searchList = document.querySelector("#searchList");
             if (searchList) { searchList.scrollTo({ top: 0, behavior: 'smooth' }); }
+            g_scroll_top = false;
         }
     }
     onload() {
