@@ -1,4 +1,5 @@
-const siyuan = require("siyuan");
+const siyuan      = require("siyuan");
+const windowfetch = window.fetch;
 
 const sql_default_order_by = "order by case type \
  when 'd' then 1\
@@ -16,7 +17,8 @@ const sql_default_order_by = "order by case type \
  when 'query_embed' then 13\
  when 'iframe' then 14\
  end, updated desc";
-const type_mapping = { // 定义思源块类型映射关系
+
+const search_type_map = { // 定义思源块类型映射关系
     audioBlock: '',
     blockquote: 'b',
     codeBlock: 'c',
@@ -35,7 +37,25 @@ const type_mapping = { // 定义思源块类型映射关系
     videoBlock: '',
     widgetBlock: ''
 };
-const search_method_mapping = {
+
+const sql_type_map = {
+    'd': 'NodeDocument',
+    'h': 'NodeHeading',
+    'i': 'NodeListItem',
+    'p': 'NodeParagraph', 
+    't': 'NodeTable',
+    'b': 'NodeBlockquote',
+    'c': 'NodeCodeBlock',
+    'm': 'NodeMathBlock',
+    'l': 'NodeList',
+    's': 'NodeSuperBlock',
+    'html': 'NodeHTMLBlock',
+    'widget': 'NodeWidget',
+    'query_embed': 'NodeQueryEmbed',
+    'iframe': 'NodeIFrame'
+};
+
+const search_method_map = {
     "-w": 0, // 关键字搜索
     "-q": 1, // 查询语法搜索
     "-s": 2, // SQL搜索
@@ -69,6 +89,7 @@ function parseInputItems(search_keywords) {
         options: options
     };
 }
+
 function transferSqlKeyWords(key_words, excluded_key_words, field = "content") {
     let conditions = [];
     for (let keyword of key_words) {
@@ -79,6 +100,7 @@ function transferSqlKeyWords(key_words, excluded_key_words, field = "content") {
     }
     return conditions.length > 0 ? `(${conditions.join(' and ')}) ` : "true ";
 }
+
 function transferSqlTypes(options) {
     let sql_type_rlike = ""; // sql筛选块的语句
     const type_handler = {   // 这里使用REGEXP而不是rlike，因为递归查询不支持rlike
@@ -110,13 +132,14 @@ function transferSqlTypes(options) {
         let types = "";
         let search_types = window.siyuan.storage['local-searchdata'].types;
         for (const key in search_types) {
-            if (search_types[key]) types += type_mapping[key];
+            if (search_types[key]) types += search_type_map[key];
         }
         sql_type_rlike = `type REGEXP '^[${types}]$' `;
     }
     sql_type_rlike = "and (" + sql_type_rlike + ") ";
     return sql_type_rlike;
 }
+
 function transferSqlOrderby(options) {
     let sql_order_by = "order by case type";
     if (options != "") {
@@ -129,9 +152,10 @@ function transferSqlOrderby(options) {
     }
     return sql_order_by;
 }
+
 function translateSearchInput(search_keywords) {
     if (search_keywords.length < 2) { return "-w" + search_keywords; }
-    if (search_keywords.match("^-[wqrs]") != null) { return search_keywords; }
+    if (search_keywords.match(/^-[wqrs]/) != null) { return search_keywords; }
     if (search_keywords.match(/\|/) != null) { return translateSearchInputPipe(search_keywords); }
     let input_text_items            = parseInputItems(search_keywords);
     let key_words                   = input_text_items.key_words;          // 搜索关键词
@@ -193,6 +217,7 @@ function translateSearchInput(search_keywords) {
     // 完整sql语句
     return "-s" + sql_prefix + sql_key_words + sql_type_rlike + sql_current_doc + sql_order_by;
 }
+
 function translateSearchInputPipe(search_keywords) {
     g_search_group = 1; // 设置分组方式为按文档分组
     let input_text_items = search_keywords.split("|");
@@ -262,13 +287,72 @@ function highlightKeywords(search_list_text_nodes, keywords, highlight_type) {
     CSS.highlights.set(highlight_type, searchResultsHighlight);     // 注册高亮
 }
 
+function truncateContent(content, maxLength = 96) {
+    if (!content) return '';
+    return content.length > maxLength ? content.substring(0, maxLength) + '...' : content;
+};
+
+async function refSQLFetch(url, init) {
+    if (url != '/api/search/searchRefBlock') { // 仅拦截块引搜索请求
+        return await windowfetch(url, init);
+    }
+
+    // 解析原始请求参数
+    const request_body = JSON.parse(init.body);
+    let keyword = request_body.k;
+    const regex = /\s?-[dhlptbsicmoOL1-6]+$/;
+    const type = keyword.match(regex);
+    if (type == null) { // 未指定块类型时，使用块引原始请求
+        return await windowfetch(url, init);
+    }
+
+    // 构建 SQL 查询语句，查询指定类型
+    keyword = keyword.replace(regex, "");
+    let sql = `SELECT * FROM blocks WHERE content LIKE '%${keyword}%' ${transferSqlTypes(type[0])} LIMIT 32`;
+    const sql_response = await fetch('/api/query/sql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stmt: sql })
+    });
+
+    const sql_json = await sql_response.json();
+
+    // 将 SQL 结果转换为 refblock 格式
+    const refblock = {
+        code: 0,
+        msg: "",
+        data: {
+            blocks: sql_json.data.map(block => ({
+                ...block,                                 // 展开所有原始字段
+                type: sql_type_map[block.type],           // type 字段转换
+                hPath: block.hpath,                       // 修正字段名差异
+                refText: truncateContent(block.content),  // 添加缺少的字段
+            })),
+            k: keyword,
+            newDoc: true,
+        }
+    };
+
+    // 创建新的 Response 对象
+    const response = new Response(
+        JSON.stringify(refblock),
+        {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'Content-Type': 'application/json' }
+        }
+    );
+
+    return response;
+};
+
 let g_highlight_keywords = false;
 class SimpleSearch extends siyuan.Plugin {
     inputSearchEvent(data) {
         let search_keywords            = data.detail.config.query;
         let search_keywords_translated = translateSearchInput(search_keywords);
         // 设置搜索参数
-        data.detail.config.method = search_method_mapping[search_keywords_translated.slice(0, 2)];
+        data.detail.config.method = search_method_map[search_keywords_translated.slice(0, 2)];
         data.detail.config.query  = search_keywords_translated.slice(2);
         window.siyuan.storage["local-searchdata"].k = search_keywords; // 保存搜索关键词，下次打开索面板时默认填充
         
@@ -277,6 +361,7 @@ class SimpleSearch extends siyuan.Plugin {
             data.detail.config.group = g_search_group; // 设置分组方式
         }
     }
+
     loadedProtyleStaticEvent() {    // 在界面加载完毕后高亮关键词
         if (g_highlight_keywords) { // 判断是否需要高亮关键词
             CSS.highlights.clear(); // 清除上个高亮
@@ -301,13 +386,16 @@ class SimpleSearch extends siyuan.Plugin {
             g_highlight_keywords = false;
         }
     }
+
     onload() {
+        window.fetch = refSQLFetch;
         this.eventBus.on("input-search", this.inputSearchEvent);
         this.eventBus.on("loaded-protyle-static", this.loadedProtyleStaticEvent);
         console.log("simple search start...")
     }
 
     onunload() {
+        window.fetch = windowfetch;
         this.eventBus.off("input-search", this.inputSearchEvent);
         this.eventBus.off("loaded-protyle-static", this.loadedProtyleStaticEvent);
         console.log("simple search stop...")
