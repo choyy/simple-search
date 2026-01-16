@@ -153,6 +153,47 @@ function transferSqlOrderby(options) {
     return sql_order_by;
 }
 
+function translateSearchInputPipe(search_keywords) {
+    g_search_group = 1; // 设置分组方式为按文档分组
+    let input_text_items = search_keywords.split("|");
+    // 查询条件2
+    let { key_words, excluded_key_words, options } = parseInputItems(input_text_items[input_text_items.length - 1]);
+    let sql_key_words  = transferSqlKeyWords(key_words, excluded_key_words, "b.content");
+    let sql_types      = transferSqlTypes(options);
+    let sql_condition2 = sql_key_words + sql_types;
+    let sql_order_by   = transferSqlOrderby(options);
+
+    sql_key_words = transferSqlKeyWords(key_words, excluded_key_words); // 非递归查询的查询条件
+    let sql_condition2_common = sql_key_words + sql_types;
+    g_keywords = key_words; // 高亮关键词
+
+    // 查询条件1
+    ({ key_words, excluded_key_words, options } = parseInputItems(input_text_items[0]));
+    options = options.replace(/[^Ddh]/g, ""); // 初始查询条件仅查询文档、标题
+
+    if (options.match(/D/) == null) { // 仅在文档、标题下搜索
+        sql_key_words = transferSqlKeyWords(key_words, excluded_key_words);
+        sql_types = `and type GLOB '[${options == "" ? "dh" : options}]' `;
+        let sql_recursive = `
+        WITH RECURSIVE ChildBlocks AS (
+            SELECT id, parent_id FROM blocks WHERE id IN (
+                SELECT id FROM blocks WHERE ${sql_key_words + sql_types}
+            )
+            UNION ALL
+            SELECT b.id, b.parent_id FROM blocks b
+            INNER JOIN ChildBlocks cb ON b.parent_id = cb.id
+        )
+        SELECT DISTINCT b.* FROM blocks b
+        JOIN ChildBlocks cb ON b.id = cb.id
+        WHERE ${sql_condition2} ${sql_order_by}
+        `;
+        return "-s" + sql_recursive;
+    } else { // 在文档及子文档下搜索
+        sql_key_words = transferSqlKeyWords(key_words, excluded_key_words, "hpath");
+        return `-sselect * from blocks where ${sql_key_words} and ${sql_condition2_common} ${sql_order_by} `; // 直接查询文档
+    }
+}
+
 function translateSearchInput(search_keywords) {
     if (search_keywords.length < 2) { return "-w" + search_keywords; }
     if (search_keywords.match(/^-[wqrs]/) != null) { return search_keywords; }
@@ -216,47 +257,6 @@ function translateSearchInput(search_keywords) {
 
     // 完整sql语句
     return "-s" + sql_prefix + sql_key_words + sql_type_rlike + sql_current_doc + sql_order_by;
-}
-
-function translateSearchInputPipe(search_keywords) {
-    g_search_group = 1; // 设置分组方式为按文档分组
-    let input_text_items = search_keywords.split("|");
-    // 查询条件2
-    let { key_words, excluded_key_words, options } = parseInputItems(input_text_items[input_text_items.length - 1]);
-    let sql_key_words  = transferSqlKeyWords(key_words, excluded_key_words, "b.content");
-    let sql_types      = transferSqlTypes(options);
-    let sql_condition2 = sql_key_words + sql_types;
-    let sql_order_by   = transferSqlOrderby(options);
-
-    sql_key_words = transferSqlKeyWords(key_words, excluded_key_words); // 非递归查询的查询条件
-    let sql_condition2_common = sql_key_words + sql_types;
-    g_keywords = key_words; // 高亮关键词
-
-    // 查询条件1
-    ({ key_words, excluded_key_words, options } = parseInputItems(input_text_items[0]));
-    options = options.replace(/[^Ddh]/g, ""); // 初始查询条件仅查询文档、标题
-
-    if (options.match(/D/) == null) { // 仅在文档、标题下搜索
-        sql_key_words = transferSqlKeyWords(key_words, excluded_key_words);
-        sql_types = `and type GLOB '[${options == "" ? "dh" : options}]' `;
-        let sql_recursive = `
-        WITH RECURSIVE ChildBlocks AS (
-            SELECT id, parent_id FROM blocks WHERE id IN (
-                SELECT id FROM blocks WHERE ${sql_key_words + sql_types}
-            )
-            UNION ALL
-            SELECT b.id, b.parent_id FROM blocks b
-            INNER JOIN ChildBlocks cb ON b.parent_id = cb.id
-        )
-        SELECT DISTINCT b.* FROM blocks b
-        JOIN ChildBlocks cb ON b.id = cb.id
-        WHERE ${sql_condition2} ${sql_order_by}
-        `;
-        return "-s" + sql_recursive;
-    } else { // 在文档及子文档下搜索
-        sql_key_words = transferSqlKeyWords(key_words, excluded_key_words, "hpath");
-        return `-sselect * from blocks where ${sql_key_words} and ${sql_condition2_common} ${sql_order_by} `; // 直接查询文档
-    }
 }
 
 function highlightKeywords(search_list_text_nodes, keywords, highlight_type) {
@@ -362,29 +362,28 @@ class SimpleSearch extends siyuan.Plugin {
         }
     }
 
-    loadedProtyleStaticEvent() {    // 在界面加载完毕后高亮关键词
-        if (g_highlight_keywords) { // 判断是否需要高亮关键词
-            CSS.highlights.clear(); // 清除上个高亮
-            // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
-            const search_list = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchList')
-                             || document.querySelector('#layouts #searchList'); // 搜索结果列表的节点
-            if (search_list == null) return; // 判断是否存在搜索界面
-            const search_list_text_nodes = Array.from(search_list.querySelectorAll(".b3-list-item__text"), el => el.firstChild); // 获取所有具有 b3-list-item__text 类的节点的文本子节点
-            highlightKeywords(search_list_text_nodes, g_keywords, "highlight-keywords-search-list");
-            const search_preview = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchPreview')
-                                || document.querySelector('#layouts #searchPreview'); // 搜索预览内容的节点
-            const tree_walker = document.createTreeWalker(search_preview.children[1].children[0], NodeFilter.SHOW_TEXT); // 创建 createTreeWalker 迭代器，用于遍历文本节点，保存到一个数组
-            const search_preview_text_nodes = [];
-            let current_node = tree_walker.nextNode();
-            while (current_node) {
-                if (current_node.textContent.trim().length > 0) {
-                    search_preview_text_nodes.push(current_node);
-                }
-                current_node = tree_walker.nextNode();
+    loadedProtyleStaticEvent() {               // 在界面加载完毕后高亮关键词
+        if (!g_highlight_keywords) { return; } // 判断是否需要高亮关键词
+        CSS.highlights.clear(); // 清除上个高亮
+        // 需考虑搜索页签和搜索面板同时打开的情况，优先选择搜索面板的搜索框
+        const search_list = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchList')
+                         || document.querySelector('#layouts #searchList'); // 搜索结果列表的节点
+        if (search_list == null) { return; } // 判断是否存在搜索界面
+        const search_list_text_nodes = Array.from(search_list.querySelectorAll(".b3-list-item__text"), el => el.firstChild); // 获取所有具有 b3-list-item__text 类的节点的文本子节点
+        highlightKeywords(search_list_text_nodes, g_keywords, "highlight-keywords-search-list");
+        const search_preview = document.querySelector('body>script~div[data-key="dialog-globalsearch"] #searchPreview')
+                            || document.querySelector('#layouts #searchPreview'); // 搜索预览内容的节点
+        const tree_walker = document.createTreeWalker(search_preview.children[1].children[0], NodeFilter.SHOW_TEXT); // 创建 createTreeWalker 迭代器，用于遍历文本节点，保存到一个数组
+        const search_preview_text_nodes = [];
+        let current_node = tree_walker.nextNode();
+        while (current_node) {
+            if (current_node.textContent.trim().length > 0) {
+                search_preview_text_nodes.push(current_node);
             }
-            highlightKeywords(search_preview_text_nodes, g_keywords, "highlight-keywords-search-preview");
-            g_highlight_keywords = false;
+            current_node = tree_walker.nextNode();
         }
+        highlightKeywords(search_preview_text_nodes, g_keywords, "highlight-keywords-search-preview");
+        g_highlight_keywords = false;
     }
 
     onload() {
